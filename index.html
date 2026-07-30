@@ -106,6 +106,8 @@
     font-size: 12px; font-weight: 600; color: var(--text);
   }
   .stat-pill .num { font-size: 15px; }
+  .stat-pill { cursor: pointer; transition: transform 0.12s; }
+  .stat-pill:active { transform: scale(0.95); }
   .stat-pill.green .num { color: var(--mint); }
   .stat-pill.orange .num { color: var(--primary); }
   .stat-pill.pink .num { color: var(--pink-red); }
@@ -520,6 +522,27 @@
   .week-item .w-icon { font-size: 14px; }
   .week-item .w-cat { font-weight: 600; flex: 1; }
   .week-item .w-time { color: var(--text-light); font-weight: 600; }
+
+  /* ============ 一周房态总览表格 ============ */
+  .week-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 12px; }
+  .week-table { border-collapse: collapse; font-size: 11px; min-width: 100%; }
+  .week-table th, .week-table td { border: 1px solid var(--gray); text-align: center; padding: 0; }
+  .week-table th { background: var(--bg); color: var(--text-light); font-weight: 600; padding: 6px 4px; position: sticky; top: 0; z-index: 1; }
+  .week-table th.room-col { position: sticky; left: 0; z-index: 2; min-width: 70px; }
+  .week-table td.room-col { position: sticky; left: 0; z-index: 1; background: var(--card-bg); font-weight: 700; text-align: left; padding: 6px 8px; min-width: 70px; white-space: nowrap; }
+  .week-table td.day-cell { width: 42px; height: 36px; vertical-align: middle; }
+  .week-table td.free { background: var(--mint-light); }
+  .week-table td.booked { background: var(--orange-bg); }
+  .week-table td.occupied { background: var(--primary-light); }
+  .week-table td.maintenance { background: var(--gray); }
+  .week-table td.free::after { content: "🟢"; }
+  .week-table td.booked::after { content: "📕"; }
+  .week-table td.occupied::after { content: "🐱"; }
+  .week-table td.maintenance::after { content: "🔧"; }
+  .week-table td.today-col { border-left: 2px solid var(--primary); border-right: 2px solid var(--primary); }
+  .week-table th.today-col { background: var(--primary-light); color: var(--primary); }
+  .week-table td { cursor: pointer; }
+  .week-table td:active { opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -531,9 +554,9 @@
     <div style="font-size:12px;opacity:0.9" id="todayLabel"></div>
   </div>
   <div class="header-stats" id="statsBar">
-    <div class="stat-pill green"><span>🟢 空闲</span><span class="num" id="statFree">0</span></div>
-    <div class="stat-pill orange"><span>🟠 在住</span><span class="num" id="statOcc">0</span></div>
-    <div class="stat-pill pink"><span>📕 预定</span><span class="num" id="statBook">0</span></div>
+    <div class="stat-pill green" onclick="showStatList('free')"><span>🟢 空闲</span><span class="num" id="statFree">0</span></div>
+    <div class="stat-pill orange" onclick="showStatList('occupied')"><span>🟠 在住</span><span class="num" id="statOcc">0</span></div>
+    <div class="stat-pill pink" onclick="showStatList('booked')"><span>📕 预定</span><span class="num" id="statBook">0</span></div>
   </div>
 </div>
 
@@ -543,14 +566,11 @@
   <div id="pickupWrap"></div>
 </div>
 
-<!-- ============ 今日预定横幅（重点突出）============ -->
+<!-- ============ 家长送猫/接猫横幅（并排）============ -->
 <div class="pickup-section">
-  <div class="pickup-section-title">📦 家长送猫到店</div>
+  <div class="pickup-section-title">👨‍👩‍👧 家长送猫/接猫</div>
   <div id="bookingInWrap"></div>
-</div>
-<div class="pickup-section">
-  <div class="pickup-section-title">🎁 家长接猫回家</div>
-  <div id="bookingOutWrap"></div>
+  <div id="bookingOutWrap" style="margin-top:10px"></div>
 </div>
 
 <!-- ============ 日期选择（日历 + 快捷条）============ -->
@@ -564,6 +584,11 @@
   <div class="cal-grid" id="calGrid"></div>
   <!-- 快捷日期条 -->
   <div class="date-scroll" id="dateScroll"></div>
+</div>
+
+<!-- 一周房态总览按钮 -->
+<div style="padding:4px 16px 0">
+  <button class="btn btn-primary" style="width:100%;padding:11px;font-size:14px" onclick="openWeekView()">📊 一周房态总览（一眼看哪天空房）</button>
 </div>
 
 <!-- ============ 房型看板（动态渲染分区）============ -->
@@ -584,6 +609,24 @@
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="detailTitle">📋</div>
     <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- ============ 统计列表浮层 ============ -->
+<div class="overlay" id="statOverlay" onclick="if(event.target===this)closeOverlay('statOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="statTitle">📋</div>
+    <div id="statBody"></div>
+  </div>
+</div>
+
+<!-- ============ 一周房态总览浮层 ============ -->
+<div class="overlay" id="weekOverlay" onclick="if(event.target===this)closeOverlay('weekOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">📊 一周房态总览</div>
+    <div id="weekBody"></div>
   </div>
 </div>
 
@@ -660,6 +703,15 @@
           <button class="tag-btn" onclick="pickTag('neuter','已绝育',this)">已绝育</button>
           <button class="tag-btn" onclick="pickTag('neuter','未绝育',this)">未绝育</button>
           <button class="tag-btn" onclick="pickTag('neuter','不详',this)">不详</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">驱虫情况</label>
+        <div class="tag-group" id="dewormGroup">
+          <button class="tag-btn" onclick="pickTag('deworm','已驱虫',this)">已驱虫</button>
+          <button class="tag-btn" onclick="pickTag('deworm','未驱虫',this)">未驱虫</button>
+          <button class="tag-btn" onclick="pickTag('deworm','部分驱虫',this)">部分驱虫</button>
+          <button class="tag-btn" onclick="pickTag('deworm','不详',this)">不详</button>
         </div>
       </div>
       <div class="field">
@@ -746,7 +798,7 @@ let bookings = [];
 let selectedDate = new Date();
 let formState = {
   ageUnit: '岁',
-  vaccine: '', neuter: '', health: [],
+  vaccine: '', neuter: '', deworm: '', health: [],
   roomType: '', delivery: '', editId: null, presetRoom: null
 };
 
@@ -789,7 +841,7 @@ function loadSampleData(){
     {
       id:'b001', ownerName:'张小姐', phone:'13812345678',
       catName:'咪咪', breed:'布偶', age:{value:2,unit:'岁'}, weight:4.5,
-      vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
+      vaccine:'已完整接种', neutered:'已绝育', deworm:'已驱虫', health:['健康'],
       notes:'怕生，不要和其他猫接触',
       roomType:'大柜', roomId:'大柜1',
       checkIn:fmt(t), checkOut:fmt(out1),
@@ -798,7 +850,7 @@ function loadSampleData(){
     {
       id:'b002', ownerName:'李先生', phone:'13987654321',
       catName:'橘子', breed:'橘猫', age:{value:5,unit:'岁'}, weight:6.2,
-      vaccine:'部分接种', neutered:'未绝育', health:['需服药','特殊护理'],
+      vaccine:'部分接种', neutered:'未绝育', deworm:'未驱虫', health:['需服药','特殊护理'],
       notes:'每天需服药，有过敏体质',
       roomType:'包房', roomId:'V1',
       checkIn:fmt(tom), checkOut:'',
@@ -807,7 +859,7 @@ function loadSampleData(){
     {
       id:'b003', ownerName:'王阿姨', phone:'13611112222',
       catName:'团子', breed:'英短', age:{value:1,unit:'岁'}, weight:3.8,
-      vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
+      vaccine:'已完整接种', neutered:'已绝育', deworm:'部分驱虫', health:['健康'],
       notes:'很黏人，喜欢玩毛线球',
       roomType:'小柜', roomId:'主卧1-小柜3',
       checkIn:fmt(in3), checkOut:fmt(t2),
@@ -879,6 +931,140 @@ function renderStats(){
   document.getElementById('statFree').textContent = free;
   document.getElementById('statOcc').textContent = occ;
   document.getElementById('statBook').textContent = book;
+}
+
+/* ============ 统计列表：点击统计条查看详情 ============ */
+function showStatList(type){
+  const titles = {free:'🟢 空闲房间', occupied:'🟠 在住中', booked:'📕 已预定'};
+  document.getElementById('statTitle').textContent = titles[type]||'列表';
+
+  // 收集该状态的所有房间
+  const items = [];
+  for(const r of ALL_ROOMS){
+    const s = getRoomStatus(r.id, selectedDate);
+    if(s.status===type && s.booking){
+      items.push({room:r, booking:s.booking});
+    } else if(s.status===type){
+      items.push({room:r, booking:null});
+    }
+  }
+
+  let html = '';
+  // 顶部显示日期
+  const dStr = (selectedDate.getMonth()+1)+'月'+selectedDate.getDate()+'日';
+  html += `<div style="padding:0 16px 10px;font-size:12px;color:var(--text-light)">📅 ${dStr} 房态</div>`;
+
+  if(items.length===0){
+    html += '<div class="detail-card" style="text-align:center;color:var(--text-light);padding:30px"><div style="font-size:36px;margin-bottom:6px">🐱</div>暂无</div>';
+  } else {
+    if(type==='free'){
+      // 空闲：显示房间名 + 该房间未来7天可用情况
+      html += '<div style="padding:0 16px 10px;font-size:11px;color:var(--text-light)">💡 点击房间可查看未来7天空闲时段</div>';
+      for(const it of items){
+        const r = it.room;
+        // 计算未来7天哪些天空闲
+        let freeDays = [];
+        const today = new Date(); today.setHours(0,0,0,0);
+        for(let i=0;i<7;i++){
+          const d = new Date(today); d.setDate(d.getDate()+i);
+          const st = getRoomStatus(r.id, d);
+          if(st.status==='free') freeDays.push(d.getDate()+'日');
+        }
+        html += `<div class="detail-card" onclick="openRoomDetail('${r.id}')" style="cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><span style="font-size:18px">🟢</span> <strong>${r.label||r.id}</strong> <span style="font-size:11px;color:var(--text-light)">${r.type}</span></div>
+            <span style="font-size:12px;color:var(--mint);font-weight:700">${freeDays.length}/7天空闲</span>
+          </div>
+          ${freeDays.length>0 ? `<div style="margin-top:8px;font-size:12px;color:var(--text-light)">空闲日：${freeDays.join('、')}</div>` : '<div style="margin-top:8px;font-size:12px;color:var(--pink-red)">未来7天已满</div>'}
+        </div>`;
+      }
+    } else if(type==='occupied'){
+      // 在住：显示房间+猫咪+入住到退房时段
+      for(const it of items){
+        const b = it.booking;
+        const ci = parseDT(b.checkIn);
+        const co = b.checkOut?parseDT(b.checkOut):null;
+        const ciStr = ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-';
+        const coStr = co?co.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'未定';
+        html += `<div class="detail-card" onclick="openRoomDetail('${it.room.id}','${b.id}')" style="cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div><span style="font-size:18px">🐱</span> <strong>${b.catName}</strong> <span style="font-size:11px;color:var(--text-light)">${b.breed}</span></div>
+            <span style="font-size:12px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:2px 8px;border-radius:10px">${it.room.label||it.room.id}</span>
+          </div>
+          <div class="detail-row"><span class="label">入住时间</span><span class="val">${ciStr}</span></div>
+          <div class="detail-row"><span class="label">退房时间</span><span class="val">${coStr}</span></div>
+          <div class="detail-row"><span class="label">主人</span><span class="val">${b.ownerName} ${b.phone.slice(-4)}</span></div>
+        </div>`;
+      }
+    } else if(type==='booked'){
+      // 预定：显示猫咪姓名、房型、到店方式（店铺接还是家长送）
+      for(const it of items){
+        const b = it.booking;
+        const ci = parseDT(b.checkIn);
+        const ciStr = ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-';
+        // 到店方式判断
+        const isShop = b.delivery==='上门接送' || b.delivery==='顺风车';
+        const deliveryIcon = isShop ? '🚗 店铺接猫' : '👨‍👩‍👧 家长送猫';
+        html += `<div class="detail-card" onclick="openRoomDetail('${it.room.id}','${b.id}')" style="cursor:pointer">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div><span style="font-size:18px">📕</span> <strong>${b.catName}</strong> <span style="font-size:11px;color:var(--text-light)">${b.breed}</span></div>
+            <span style="font-size:12px;font-weight:700;color:#7B5FBE;background:#F0EAFF;padding:2px 8px;border-radius:10px">${it.room.label||it.room.id}</span>
+          </div>
+          <div class="detail-row"><span class="label">到店时间</span><span class="val">${ciStr}</span></div>
+          <div class="detail-row"><span class="label">房型</span><span class="val">${b.roomType}</span></div>
+          <div class="detail-row"><span class="label">到店方式</span><span class="val" style="font-weight:700;color:${isShop?'var(--primary)':'var(--mint)'}">${deliveryIcon}</span></div>
+          <div class="detail-row"><span class="label">主人</span><span class="val">${b.ownerName} ${b.phone.slice(-4)}</span></div>
+          ${b.notes?`<div class="detail-row"><span class="label">注意</span><span class="val" style="max-width:60%;text-align:right">${b.notes}</span></div>`:''}
+        </div>`;
+      }
+    }
+  }
+  document.getElementById('statBody').innerHTML = html;
+  document.getElementById('statOverlay').classList.add('show');
+}
+
+/* ============ 一周房态总览：房间×时间表格 ============ */
+function openWeekView(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(today); d.setDate(d.getDate()+i);
+    days.push(d);
+  }
+
+  let html = '';
+  // 图例
+  html += '<div style="padding:4px 16px 10px;font-size:11px;color:var(--text-light);display:flex;gap:12px;flex-wrap:wrap">';
+  html += '<span>🟢 空闲</span><span>📕 预定</span><span>🐱 在住</span><span>🔧 维护</span>';
+  html += '</div>';
+
+  // 表格
+  html += '<div class="week-table-wrap"><table class="week-table"><thead><tr>';
+  html += '<th class="room-col">房间</th>';
+  for(const d of days){
+    const isToday = sameDay(d, today);
+    html += `<th class="${isToday?'today-col':''}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:10px">${'日一二三四五六'[d.getDay()]}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for(const r of ALL_ROOMS){
+    html += `<tr><td class="room-col">${r.label||r.id}</td>`;
+    for(const d of days){
+      const s = getRoomStatus(r.id, d);
+      const isToday = sameDay(d, today);
+      let cellText = '';
+      if(s.booking) cellText = s.booking.catName;
+      html += `<td class="day-cell ${s.status} ${isToday?'today-col':''}" onclick="closeOverlay('weekOverlay');selectedDate=new Date(${d.getTime()});calMonth=new Date(${d.getTime()});renderAll();openRoomDetail('${r.id}')" title="${r.label||r.id} ${d.getMonth()+1}/${d.getDate()} ${s.status}${s.booking?' '+s.booking.catName:''}"></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+
+  // 说明
+  html += '<div style="padding:8px 16px 16px;font-size:11px;color:var(--text-light)">💡 点击任意单元格可跳转到该日期该房间的详情。向右滑动查看更多天数。</div>';
+
+  document.getElementById('weekBody').innerHTML = html;
+  document.getElementById('weekOverlay').classList.add('show');
 }
 
 /* ============ 渲染：日历选择器 + 日期条 ============ */
@@ -1218,6 +1404,7 @@ function openRoomDetail(roomId, highlightBookingId){
         <div class="detail-row"><span class="label">体重</span><span class="val">${b.weight||'-'} kg</span></div>
         <div class="detail-row"><span class="label">疫苗</span><span class="val">${b.vaccine}</span></div>
         <div class="detail-row"><span class="label">绝育</span><span class="val">${b.neutered}</span></div>
+        ${b.deworm?`<div class="detail-row"><span class="label">驱虫</span><span class="val">${b.deworm}</span></div>`:''}
         <div class="detail-row"><span class="label">健康</span><span class="val">${b.health.join('、')}</span></div>
         <div class="detail-row"><span class="label">入住</span><span class="val">${ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-'}</span></div>
         <div class="detail-row"><span class="label">退房</span><span class="val">${co?co.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'未定'}</span></div>
@@ -1255,7 +1442,7 @@ function editBooking(id){
 /* ============ 表单 ============ */
 function openForm(booking, presetRoom){
   // 重置
-  formState = { ageUnit:'岁', vaccine:'', neuter:'', health:[], roomType:'', delivery:'', editId:null, presetRoom:null };
+  formState = { ageUnit:'岁', vaccine:'', neuter:'', deworm:'', health:[], roomType:'', delivery:'', editId:null, presetRoom:null };
   document.getElementById('f_ownerName').value='';
   document.getElementById('f_phone').value='';
   document.getElementById('f_catName').value='';
@@ -1292,6 +1479,7 @@ function openForm(booking, presetRoom){
     pickTag('ageUnit', booking.age.unit);
     formState.vaccine = booking.vaccine;
     formState.neuter = booking.neutered;
+    formState.deworm = booking.deworm || '';
     formState.health = [...booking.health];
     formState.roomType = booking.roomType;
     formState.delivery = booking.delivery;
@@ -1353,6 +1541,10 @@ function syncTagBtns(){
   document.querySelectorAll('#neuterGroup .tag-btn').forEach(el=>{
     el.classList.toggle('active', el.textContent===formState.neuter);
   });
+  // deworm
+  document.querySelectorAll('#dewormGroup .tag-btn').forEach(el=>{
+    el.classList.toggle('active', el.textContent===formState.deworm);
+  });
   // health
   document.querySelectorAll('#healthGroup .tag-btn').forEach(el=>{
     el.classList.toggle('active', formState.health.includes(el.textContent));
@@ -1378,6 +1570,7 @@ function pickTag(key, val, el){
   }
   if(key==='vaccine') formState.vaccine = val;
   else if(key==='neuter') formState.neuter = val;
+  else if(key==='deworm') formState.deworm = val;
   else if(key==='roomType'){
     formState.roomType = val;
     formState.presetRoom = null; // 切换房型时清除已选房间
@@ -1417,6 +1610,7 @@ function saveForm(){
   if(!checkIn){ toast('请选择入住日期'); return; }
   if(!formState.vaccine){ toast('请选择疫苗情况'); return; }
   if(!formState.neuter){ toast('请选择绝育情况'); return; }
+  if(!formState.deworm){ toast('请选择驱虫情况'); return; }
 
   // 选房
   let roomId = formState.presetRoom;
@@ -1437,6 +1631,7 @@ function saveForm(){
     weight: parseFloat(document.getElementById('f_weight').value)||0,
     vaccine: formState.vaccine,
     neutered: formState.neuter,
+    deworm: formState.deworm,
     health: formState.health.length?formState.health:['健康'],
     notes: document.getElementById('f_notes').value.trim(),
     roomType: formState.roomType,

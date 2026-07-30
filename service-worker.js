@@ -1,5 +1,5 @@
 // 猫咪寄养工作台 Service Worker
-const CACHE_NAME = 'cat-hotel-v3';
+const CACHE_NAME = 'cat-hotel-v4';
 const ASSETS = [
   './',
   './index.html',
