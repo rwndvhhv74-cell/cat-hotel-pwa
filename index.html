@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+<!-- ============ PWA 配置 ============ -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="猫咪工作台">
+<meta name="application-name" content="猫咪工作台">
+<meta name="theme-color" content="#FF9F6B">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+
+<!-- 图标 -->
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+
+<!-- 启动画面 (iOS) -->
+<link rel="apple-touch-startup-image" href="icon-512.png">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<title>🐱 猫咪寄养工作台</title>
+<style>
+  /* ============ 设计变量 ============ */
+  :root {
+    --bg: #FFF8F0;
+    --card-bg: #FFFFFF;
+    --primary: #FF9F6B;
+    --primary-light: #FFD3B6;
+    --mint: #7DD3A8;
+    --mint-light: #D4F0E0;
+    --blue: #A8D8E8;
+    --pink: #FFB6C1;
+    --pink-red: #FF6B7A;
+    --text: #5D4E3C;
+    --text-light: #8B7E6B;
+    --gray: #E8E0D5;
+    --gray-dark: #C4B8A8;
+    --orange-bg: #FFF0E0;
+    --mint-bg: #E8F7EE;
+    --shadow: 0 2px 12px rgba(93, 78, 60, 0.08);
+    --shadow-hover: 0 4px 20px rgba(93, 78, 60, 0.15);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    padding-bottom: 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; }
+  input, select, textarea { font-family: inherit; font-size: 14px; }
+
+  /* ============ 通用组件 ============ */
+  .cat-divider {
+    display: flex; align-items: center; gap: 8px;
+    margin: 16px 0 10px; padding: 0 16px;
+  }
+  .cat-divider::after {
+    content: ""; flex: 1; height: 2px;
+    background: repeating-linear-gradient(90deg, var(--primary-light) 0 8px, transparent 8px 14px);
+    border-radius: 2px;
+  }
+  .cat-divider span {
+    font-size: 13px; font-weight: 700; color: var(--text);
+    white-space: nowrap;
+  }
+  .cat-divider .icon { font-size: 16px; }
+
+  /* ============ 顶部Header ============ */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: linear-gradient(135deg, var(--primary) 0%, #FFB088 100%);
+    padding: 12px 16px 10px;
+    box-shadow: 0 2px 12px rgba(255, 159, 107, 0.3);
+  }
+  .header-top {
+    display: flex; align-items: center; justify-content: space-between;
+    color: #fff;
+  }
+  .header-title {
+    font-size: 18px; font-weight: 700;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .header-stats {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .stat-pill {
+    flex: 1; background: rgba(255,255,255,0.92);
+    border-radius: 20px; padding: 6px 10px;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 12px; font-weight: 600; color: var(--text);
+  }
+  .stat-pill .num { font-size: 15px; }
+  .stat-pill.green .num { color: var(--mint); }
+  .stat-pill.orange .num { color: var(--primary); }
+  .stat-pill.pink .num { color: var(--pink-red); }
+
+  /* ============ 接送时间横幅 ============ */
+  .pickup-section {
+    padding: 12px 0 6px;
+  }
+  .pickup-section-title {
+    padding: 0 16px 8px;
+    font-size: 13px; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .pickup-scroll {
+    display: flex; gap: 10px;
+    overflow-x: auto; padding: 2px 16px 10px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .pickup-scroll::-webkit-scrollbar { display: none; }
+
+  .pickup-card {
+    flex-shrink: 0; width: 200px;
+    border-radius: var(--radius);
+    padding: 12px; position: relative; overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s;
+  }
+  .pickup-card:active { transform: scale(0.97); }
+  .pickup-card.in { background: linear-gradient(135deg, #FFF0E0 0%, #FFE0C8 100%); }
+  .pickup-card.out { background: linear-gradient(135deg, #E8F7EE 0%, #D0F0DC 100%); }
+  .pickup-card.urgent { background: linear-gradient(135deg, #FFE0E6 0%, #FFC8D4 100%); animation: urgentPulse 1.5s ease-in-out infinite; }
+  @keyframes urgentPulse {
+    0%,100% { box-shadow: 0 2px 12px rgba(255,107,122,0.2); }
+    50% { box-shadow: 0 2px 20px rgba(255,107,122,0.5); }
+  }
+  .pickup-card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+    border-radius: 5px 0 0 5px;
+  }
+  .pickup-card.in::before { background: var(--primary); }
+  .pickup-card.out::before { background: var(--mint); }
+  .pickup-card.urgent::before { background: var(--pink-red); }
+
+  .pickup-dir {
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; gap: 3px;
+    margin-bottom: 4px;
+  }
+  .pickup-dir.in { color: #E08040; }
+  .pickup-dir.out { color: #4DA880; }
+  .pickup-dir.urgent { color: var(--pink-red); }
+  .pickup-time {
+    font-size: 30px; font-weight: 800;
+    line-height: 1.1; letter-spacing: -1px;
+    margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pickup-card.in .pickup-time { color: #E08040; }
+  .pickup-card.out .pickup-time { color: #4DA880; }
+  .pickup-card.urgent .pickup-time { color: var(--pink-red); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.6; } }
+  .pickup-cat {
+    font-size: 14px; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .pickup-info {
+    font-size: 11px; color: var(--text-light);
+    margin-top: 3px;
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .pickup-info .tag {
+    background: rgba(255,255,255,0.7); padding: 1px 7px;
+    border-radius: 8px;
+  }
+  .pickup-countdown {
+    font-size: 11px; font-weight: 700;
+    margin-top: 6px; text-align: right;
+  }
+  .pickup-card.urgent .pickup-countdown { color: var(--pink-red); }
+
+  /* 空状态 */
+  .pickup-empty {
+    margin: 0 16px; padding: 20px;
+    background: var(--card-bg); border-radius: var(--radius);
+    text-align: center; color: var(--text-light);
+    box-shadow: var(--shadow);
+  }
+  .pickup-empty .emoji { font-size: 40px; display: block; margin-bottom: 6px; }
+  .pickup-empty .text { font-size: 13px; }
+
+  /* ============ 日期条 ============ */
+  .date-bar-wrap {
+    background: var(--card-bg);
+    box-shadow: 0 -8px 16px -8px rgba(0,0,0,0.03);
+  }
+  .date-scroll {
+    display: flex; gap: 6px;
+    overflow-x: auto; padding: 10px 16px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .date-scroll::-webkit-scrollbar { display: none; }
+  .date-chip {
+    flex-shrink: 0; width: 52px;
+    border-radius: 14px; padding: 8px 4px;
+    text-align: center; background: var(--bg);
+    border: 2px solid transparent;
+    transition: all 0.15s; position: relative;
+  }
+  .date-chip .weekday { font-size: 11px; color: var(--text-light); }
+  .date-chip .day { font-size: 17px; font-weight: 700; color: var(--text); margin-top: 2px; }
+  .date-chip .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--primary); margin: 3px auto 0;
+    opacity: 0;
+  }
+  .date-chip.has-booking .dot { opacity: 1; }
+  .date-chip.active {
+    background: var(--primary); border-color: var(--primary);
+  }
+  .date-chip.active .weekday, .date-chip.active .day { color: #fff; }
+  .date-chip.active .dot { background: #fff; }
+  .date-chip.today::before {
+    content: "🐾"; position: absolute; top: -4px; right: -4px;
+    font-size: 13px;
+  }
+
+  /* ============ 房型看板 ============ */
+  .room-section { padding: 4px 0 16px; }
+  .room-grid {
+    display: grid; gap: 8px; padding: 0 16px;
+  }
+  .room-grid.large { grid-template-columns: repeat(3, 1fr); }
+  .room-grid.small { grid-template-columns: repeat(6, 1fr); }
+  .room-grid.vip { grid-template-columns: repeat(2, 1fr); }
+
+  .room-card {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    position: relative; transition: transform 0.12s;
+    box-shadow: var(--shadow);
+    text-align: center; padding: 4px 2px;
+  }
+  .room-card:active { transform: scale(0.93); }
+  .room-card .room-id { font-size: 10px; opacity: 0.7; }
+  .room-card .room-icon { font-size: 18px; line-height: 1; margin-bottom: 2px; }
+  .room-card .room-cat { font-size: 10px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .room-card.free { background: var(--mint-light); color: #4DA880; }
+  .room-card.booked { background: var(--orange-bg); color: #C07030; }
+  .room-card.occupied { background: var(--primary-light); color: #A05020; }
+  .room-card.maintenance { background: var(--gray); color: var(--gray-dark); }
+
+  .room-card.vip-card {
+    aspect-ratio: 2.2;
+    flex-direction: row; gap: 8px; padding: 8px 12px;
+    justify-content: flex-start;
+  }
+  .room-card.vip-card .room-icon { font-size: 24px; margin-bottom: 0; }
+  .room-card.vip-card .vip-info { text-align: left; flex: 1; }
+  .room-card.vip-card .room-id { font-size: 11px; }
+  .room-card.vip-card .room-cat { font-size: 12px; }
+
+  /* ============ 底部按钮 ============ */
+  .fab {
+    position: fixed; bottom: 20px; right: 20px; z-index: 90;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #FFB088);
+    box-shadow: 0 4px 16px rgba(255,159,107,0.4);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 28px; font-weight: 300;
+    transition: transform 0.15s;
+  }
+  .fab:active { transform: scale(0.9); }
+
+  /* ============ 浮层（详情/表单）============ */
+  .overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(93, 78, 60, 0.4);
+    display: none; align-items: flex-end; justify-content: center;
+    animation: fadeIn 0.2s;
+  }
+  .overlay.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .sheet {
+    background: var(--bg);
+    border-radius: 20px 20px 0 0;
+    width: 100%; max-height: 92vh;
+    overflow-y: auto;
+    animation: slideUp 0.25s ease-out;
+    padding: 0 0 100px;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .sheet-handle {
+    width: 40px; height: 5px; background: var(--gray-dark);
+    border-radius: 3px; margin: 10px auto 6px;
+  }
+  .sheet-title {
+    font-size: 17px; font-weight: 700; text-align: center;
+    padding: 4px 16px 12px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+
+  /* 房间详情 */
+  .detail-card {
+    margin: 0 16px 12px; background: var(--card-bg);
+    border-radius: var(--radius); padding: 14px;
+    box-shadow: var(--shadow);
+  }
+  .detail-row {
+    display: flex; justify-content: space-between;
+    padding: 7px 0; border-bottom: 1px dashed var(--gray);
+    font-size: 13px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .label { color: var(--text-light); }
+  .detail-row .val { font-weight: 600; }
+
+  /* ============ 表单 ============ */
+  .form-section {
+    margin: 0 16px 14px; background: var(--card-bg);
+    border-radius: var(--radius); padding: 14px 14px 6px;
+    box-shadow: var(--shadow);
+  }
+  .form-section-title {
+    font-size: 14px; font-weight: 700;
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 10px; color: var(--text);
+  }
+  .field { margin-bottom: 12px; }
+  .field-label {
+    font-size: 12px; color: var(--text-light);
+    margin-bottom: 5px; display: block; font-weight: 600;
+  }
+  .field-label .req { color: var(--pink-red); }
+  .field input, .field select, .field textarea {
+    width: 100%; border: 2px solid var(--gray);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+    background: #fff; color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--primary);
+  }
+  .field textarea { resize: none; min-height: 64px; }
+  .field-row { display: flex; gap: 8px; }
+  .field-row .field { flex: 1; }
+
+  .tag-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag-btn {
+    padding: 7px 14px; border-radius: 20px;
+    background: var(--bg); border: 2px solid var(--gray);
+    font-size: 12px; font-weight: 600; color: var(--text-light);
+    transition: all 0.15s;
+  }
+  .tag-btn.active {
+    background: var(--primary-light); border-color: var(--primary);
+    color: #A05020;
+  }
+  .tag-btn.active.mint {
+    background: var(--mint-light); border-color: var(--mint); color: #4DA880;
+  }
+
+  .form-actions {
+    position: sticky; bottom: 0;
+    background: var(--bg); padding: 12px 16px;
+    border-top: 1px solid var(--gray);
+    display: flex; gap: 8px;
+  }
+  .btn {
+    flex: 1; padding: 13px; border-radius: 24px;
+    font-size: 15px; font-weight: 700;
+    transition: transform 0.12s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), #FFB088);
+    color: #fff;
+    box-shadow: 0 3px 12px rgba(255,159,107,0.35);
+  }
+  .btn-ghost {
+    background: var(--bg); color: var(--text-light);
+    border: 2px solid var(--gray);
+  }
+  .btn-danger {
+    background: #FFF0F2; color: var(--pink-red);
+    border: 2px solid var(--pink-red);
+  }
+
+  /* ============ 庆祝动画 ============ */
+  .celebrate {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(255,248,240,0.95);
+    flex-direction: column;
+  }
+  .celebrate.show { display: flex; animation: fadeIn 0.3s; }
+  .celebrate .cat { font-size: 64px; animation: bounce 0.6s ease infinite alternate; }
+  .celebrate .text { font-size: 18px; font-weight: 700; color: var(--primary); margin-top: 12px; }
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-12px); } }
+
+  /* ============ Toast ============ */
+  .toast {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(93,78,60,0.92); color: #fff;
+    padding: 10px 20px; border-radius: 20px;
+    font-size: 13px; z-index: 400;
+    opacity: 0; transition: opacity 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ============ 本周接送列表 ============ */
+  .week-list {
+    margin: 0 16px 16px; background: var(--card-bg);
+    border-radius: var(--radius); padding: 12px 14px;
+    box-shadow: var(--shadow);
+  }
+  .week-list-title {
+    font-size: 13px; font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .week-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px dashed var(--gray);
+    font-size: 12px;
+  }
+  .week-item:last-child { border-bottom: none; }
+  .week-item .w-date { font-weight: 700; color: var(--text); width: 52px; flex-shrink: 0; }
+  .week-item .w-icon { font-size: 14px; }
+  .week-item .w-cat { font-weight: 600; flex: 1; }
+  .week-item .w-time { color: var(--text-light); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ============ Header ============ -->
+<div class="header">
+  <div class="header-top">
+    <div class="header-title">🐾 猫咪寄养工作台</div>
+    <div style="font-size:12px;opacity:0.9" id="todayLabel"></div>
+  </div>
+  <div class="header-stats" id="statsBar">
+    <div class="stat-pill green"><span>🟢 空闲</span><span class="num" id="statFree">0</span></div>
+    <div class="stat-pill orange"><span>🟠 在住</span><span class="num" id="statOcc">0</span></div>
+    <div class="stat-pill pink"><span>📕 预定</span><span class="num" id="statBook">0</span></div>
+  </div>
+</div>
+
+<!-- ============ 接送时间横幅 ============ -->
+<div class="pickup-section">
+  <div class="pickup-section-title">🚗 今日待接送</div>
+  <div id="pickupWrap"></div>
+</div>
+
+<!-- ============ 日期条 ============ -->
+<div class="date-bar-wrap">
+  <div class="date-scroll" id="dateScroll"></div>
+</div>
+
+<!-- ============ 房型看板 ============ -->
+<div id="boardWrap">
+  <div class="room-section">
+    <div class="cat-divider"><span class="icon">🏠</span><span>大柜区 · 6间</span></div>
+    <div class="room-grid large" id="gridLarge"></div>
+  </div>
+  <div class="room-section">
+    <div class="cat-divider"><span class="icon">📦</span><span>小柜区 · 18间</span></div>
+    <div class="room-grid small" id="gridSmall"></div>
+  </div>
+  <div class="room-section">
+    <div class="cat-divider"><span class="icon">👑</span><span>包房区 · 2间</span></div>
+    <div class="room-grid vip" id="gridVip"></div>
+  </div>
+</div>
+
+<!-- 本周接送一览 -->
+<div class="week-list" id="weekList" style="display:none">
+  <div class="week-list-title">📅 本周接送一览</div>
+  <div id="weekListBody"></div>
+</div>
+
+<!-- 新建预定按钮 -->
+<button class="fab" onclick="openForm()">＋</button>
+
+<!-- ============ 详情浮层 ============ -->
+<div class="overlay" id="detailOverlay" onclick="if(event.target===this)closeOverlay('detailOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="detailTitle">📋</div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- ============ 表单浮层 ============ -->
+<div class="overlay" id="formOverlay" onclick="if(event.target===this)closeOverlay('formOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="formTitle">📝 新建预定</div>
+
+    <!-- 基础信息 -->
+    <div class="form-section">
+      <div class="form-section-title">🐱 基础信息</div>
+      <div class="field">
+        <label class="field-label">主人姓名 <span class="req">*</span></label>
+        <input type="text" id="f_ownerName" placeholder="请输入主人姓名">
+      </div>
+      <div class="field">
+        <label class="field-label">联系电话 <span class="req">*</span></label>
+        <input type="tel" id="f_phone" placeholder="11位手机号" maxlength="11">
+      </div>
+      <div class="field">
+        <label class="field-label">猫咪名字 <span class="req">*</span></label>
+        <input type="text" id="f_catName" placeholder="猫咪的名字">
+      </div>
+      <div class="field">
+        <label class="field-label">猫咪品种</label>
+        <select id="f_breed">
+          <option value="布偶">布偶</option>
+          <option value="英短">英短</option>
+          <option value="美短">美短</option>
+          <option value="暹罗">暹罗</option>
+          <option value="橘猫">橘猫</option>
+          <option value="狸花">狸花</option>
+          <option value="缅因">缅因</option>
+          <option value="斯芬克斯">斯芬克斯</option>
+          <option value="加菲">加菲</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 猫咪档案 -->
+    <div class="form-section">
+      <div class="form-section-title">🐾 猫咪档案</div>
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">年龄 <span class="req">*</span></label>
+          <input type="number" id="f_age" placeholder="数字" min="0">
+        </div>
+        <div class="field" style="max-width:100px">
+          <label class="field-label">单位</label>
+          <div class="tag-group">
+            <button class="tag-btn active" id="ageUnit_岁" onclick="pickTag('ageUnit','岁')">岁</button>
+            <button class="tag-btn" id="ageUnit_月" onclick="pickTag('ageUnit','月')">月</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">体重 (kg)</label>
+        <input type="number" id="f_weight" placeholder="如 4.5" step="0.1">
+      </div>
+      <div class="field">
+        <label class="field-label">疫苗情况</label>
+        <div class="tag-group" id="vaccineGroup">
+          <button class="tag-btn" onclick="pickTag('vaccine','已完整接种',this)">已完整接种</button>
+          <button class="tag-btn" onclick="pickTag('vaccine','部分接种',this)">部分接种</button>
+          <button class="tag-btn" onclick="pickTag('vaccine','未接种',this)">未接种</button>
+          <button class="tag-btn" onclick="pickTag('vaccine','不详',this)">不详</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">绝育情况</label>
+        <div class="tag-group" id="neuterGroup">
+          <button class="tag-btn" onclick="pickTag('neuter','已绝育',this)">已绝育</button>
+          <button class="tag-btn" onclick="pickTag('neuter','未绝育',this)">未绝育</button>
+          <button class="tag-btn" onclick="pickTag('neuter','不详',this)">不详</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">健康状况（可多选）</label>
+        <div class="tag-group" id="healthGroup">
+          <button class="tag-btn" onclick="toggleMulti('health','健康',this)">健康</button>
+          <button class="tag-btn" onclick="toggleMulti('health','有慢性病',this)">有慢性病</button>
+          <button class="tag-btn" onclick="toggleMulti('health','需服药',this)">需服药</button>
+          <button class="tag-btn" onclick="toggleMulti('health','有皮肤病',this)">有皮肤病</button>
+          <button class="tag-btn" onclick="toggleMulti('health','特殊护理',this)">特殊护理</button>
+          <button class="tag-btn" onclick="toggleMulti('health','其他',this)">其他</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">注意事项</label>
+        <textarea id="f_notes" placeholder="如：怕生、挑食、不与其他猫接触…"></textarea>
+      </div>
+    </div>
+
+    <!-- 寄养信息 -->
+    <div class="form-section">
+      <div class="form-section-title">🛏️ 寄养信息</div>
+      <div class="field">
+        <label class="field-label">选择房型 <span class="req">*</span></label>
+        <div class="tag-group">
+          <button class="tag-btn" onclick="pickTag('roomType','大柜',this)">🏠 大柜</button>
+          <button class="tag-btn" onclick="pickTag('roomType','小柜',this)">📦 小柜</button>
+          <button class="tag-btn" onclick="pickTag('roomType','包房',this)">👑 包房</button>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label class="field-label">入住日期 <span class="req">*</span></label>
+          <input type="datetime-local" id="f_checkIn">
+        </div>
+        <div class="field">
+          <label class="field-label">退房日期 <span class="req">*</span></label>
+          <input type="datetime-local" id="f_checkOut">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">送店方式</label>
+        <div class="tag-group">
+          <button class="tag-btn" onclick="pickTag('delivery','主人送达',this)">🚶 主人送达</button>
+          <button class="tag-btn" onclick="pickTag('delivery','上门接送',this)">🚗 上门接送</button>
+          <button class="tag-btn" onclick="pickTag('delivery','顺风车',this)">🚕 顺风车</button>
+          <button class="tag-btn" onclick="pickTag('delivery','其他',this)">其他</button>
+        </div>
+      </div>
+      <div class="field" id="addrField" style="display:none">
+        <label class="field-label">接送地址</label>
+        <input type="text" id="f_address" placeholder="详细地址">
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('formOverlay')">取消</button>
+      <button class="btn btn-primary" onclick="saveForm()">🐾 保存预定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 庆祝动画 ============ -->
+<div class="celebrate" id="celebrate">
+  <div class="cat">🐱</div>
+  <div class="text">预定成功！</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 数据层 ============ */
+const STORAGE_KEY = 'cat_hotel_bookings_v1';
+let bookings = [];
+let selectedDate = new Date();
+let formState = {
+  ageUnit: '岁',
+  vaccine: '', neuter: '', health: [],
+  roomType: '', delivery: '', editId: null, presetRoom: null
+};
+
+// 房间配置
+const ROOMS = {
+  large: Array.from({length:6},(_,i)=>({id:'L'+(i+1),type:'大柜'})),
+  small: Array.from({length:18},(_,i)=>({id:'S'+(i+1),type:'小柜'})),
+  vip:   Array.from({length:2},(_,i)=>({id:'V'+(i+1),type:'包房'}))
+};
+
+// 示例数据
+function loadSampleData(){
+  const today = new Date();
+  const fmt = (d)=>d.toISOString().slice(0,16);
+  const t = new Date(today);
+  t.setHours(10,0,0,0);
+  const t2 = new Date(today); t2.setHours(18,0,0,0);
+  const t3 = new Date(today); t3.setHours(14,30,0,0);
+  const tom = new Date(today); tom.setDate(tom.getDate()+1); tom.setHours(11,0,0,0);
+  const out1 = new Date(today); out1.setDate(out1.getDate()+2); out1.setHours(17,0,0,0);
+  const in3 = new Date(today); in3.setHours(in3.getHours()+1, in3.getMinutes()+20); // 1小时内紧急
+  return [
+    {
+      id:'b001', ownerName:'张小姐', phone:'13812345678',
+      catName:'咪咪', breed:'布偶', age:{value:2,unit:'岁'}, weight:4.5,
+      vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
+      notes:'怕生，不要和其他猫接触',
+      roomType:'大柜', roomId:'L1',
+      checkIn:fmt(t), checkOut:fmt(out1),
+      delivery:'主人送达', address:''
+    },
+    {
+      id:'b002', ownerName:'李先生', phone:'13987654321',
+      catName:'橘子', breed:'橘猫', age:{value:5,unit:'岁'}, weight:6.2,
+      vaccine:'部分接种', neutered:'未绝育', health:['需服药','特殊护理'],
+      notes:'每天需服药，有过敏体质',
+      roomType:'包房', roomId:'V1',
+      checkIn:fmt(tom), checkOut:'',
+      delivery:'上门接送', address:'朝阳区xx路123号'
+    },
+    {
+      id:'b003', ownerName:'王阿姨', phone:'13611112222',
+      catName:'团子', breed:'英短', age:{value:1,unit:'岁'}, weight:3.8,
+      vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
+      notes:'很黏人，喜欢玩毛线球',
+      roomType:'小柜', roomId:'S3',
+      checkIn:fmt(in3), checkOut:fmt(t2),
+      delivery:'顺风车', address:''
+    }
+  ];
+}
+
+function loadData(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try { bookings = JSON.parse(raw); return; } catch(e){}
+  }
+  bookings = loadSampleData();
+  saveData();
+}
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+}
+
+/* ============ 日期工具 ============ */
+const WD = ['日','一','二','三','四','五','六'];
+function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtDateTimeLocal(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function parseDT(s){ if(!s) return null; const d=new Date(s); return isNaN(d)?null:d; }
+
+/* ============ 房态计算 ============ */
+function getRoomStatus(roomId, date){
+  // 维护中（暂用 localStorage 标记）
+  const maints = JSON.parse(localStorage.getItem('cat_hotel_maintenance')||'[]');
+  if(maints.includes(roomId)) return {status:'maintenance', booking:null};
+
+  const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
+  const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
+
+  const list = bookings.filter(b=>b.roomId===roomId);
+  for(const b of list){
+    const ci = parseDT(b.checkIn), co = b.checkOut?parseDT(b.checkOut):null;
+    if(!ci) continue;
+    // 入住当天算 booked（还未到店）或在住
+    const isToday = sameDay(ci, date);
+    const inRange = ci <= dayEnd && (!co || co >= dayStart);
+    if(inRange){
+      // 判断是预定还是在住：入住时间已过 = 在住
+      const now = new Date();
+      const isTodayToday = sameDay(date, now);
+      if(isTodayToday && ci <= now){
+        // 已经入住，且未退房 = 在住
+        if(!co || co > now) return {status:'occupied', booking:b};
+      }
+      // 否则是预定
+      return {status:'booked', booking:b};
+    }
+  }
+  return {status:'free', booking:null};
+}
+
+/* ============ 渲染：统计条 ============ */
+function renderStats(){
+  let free=0, occ=0, book=0;
+  const allRooms = [...ROOMS.large, ...ROOMS.small, ...ROOMS.vip];
+  for(const r of allRooms){
+    const s = getRoomStatus(r.id, selectedDate);
+    if(s.status==='free') free++;
+    else if(s.status==='occupied') occ++;
+    else if(s.status==='booked') book++;
+  }
+  document.getElementById('statFree').textContent = free;
+  document.getElementById('statOcc').textContent = occ;
+  document.getElementById('statBook').textContent = book;
+}
+
+/* ============ 渲染：日期条 ============ */
+function renderDateBar(){
+  const scroll = document.getElementById('dateScroll');
+  scroll.innerHTML = '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  for(let i=0;i<14;i++){
+    const d = new Date(today); d.setDate(d.getDate()+i);
+    const chip = document.createElement('div');
+    chip.className = 'date-chip';
+    if(sameDay(d, selectedDate)) chip.classList.add('active');
+    if(sameDay(d, today)) chip.classList.add('today');
+    // 该日是否有预定
+    const hasBook = bookings.some(b=>{
+      const ci=parseDT(b.checkIn); if(!ci) return false;
+      const co=b.checkOut?parseDT(b.checkOut):null;
+      return ci <= new Date(d.getTime()+86399999) && (!co || co >= d);
+    });
+    if(hasBook) chip.classList.add('has-booking');
+    chip.innerHTML = `<div class="weekday">${i===0?'今天':'周'+WD[d.getDay()]}</div><div class="day">${d.getDate()}</div><div class="dot"></div>`;
+    chip.onclick = ()=>{ selectedDate = d; renderAll(); };
+    scroll.appendChild(chip);
+  }
+}
+
+/* ============ 渲染：房型看板 ============ */
+function renderRoomGrid(gridEl, rooms, isVip){
+  gridEl.innerHTML = '';
+  for(const r of rooms){
+    const s = getRoomStatus(r.id, selectedDate);
+    const card = document.createElement('div');
+    card.className = 'room-card '+s.status + (isVip?' vip-card':'');
+    let icon = '🟢', label = '空闲';
+    if(s.status==='booked'){ icon='📕'; label=s.booking.catName; }
+    else if(s.status==='occupied'){ icon='🐱'; label=s.booking.catName; }
+    else if(s.status==='maintenance'){ icon='🔧'; label='维护'; }
+
+    if(isVip){
+      card.innerHTML = `<div class="room-icon">${icon}</div><div class="vip-info"><div class="room-id">${r.id} · ${r.type}</div><div class="room-cat">${label}</div></div>`;
+    } else {
+      card.innerHTML = `<div class="room-icon">${icon}</div><div class="room-id">${r.id}</div><div class="room-cat">${label}</div>`;
+    }
+    card.onclick = ()=>openRoomDetail(r.id);
+    card.oncontextmenu = (e)=>{ e.preventDefault(); toggleMaintenance(r.id); };
+    // 长按触发维护
+    let pressTimer;
+    card.addEventListener('touchstart',()=>{ pressTimer=setTimeout(()=>toggleMaintenance(r.id),600); });
+    card.addEventListener('touchend',()=>clearTimeout(pressTimer));
+    card.addEventListener('touchmove',()=>clearTimeout(pressTimer));
+    gridEl.appendChild(card);
+  }
+}
+
+function toggleMaintenance(roomId){
+  const list = JSON.parse(localStorage.getItem('cat_hotel_maintenance')||'[]');
+  const i = list.indexOf(roomId);
+  if(i>=0){ list.splice(i,1); toast(roomId+' 已恢复'); }
+  else { list.push(roomId); toast(roomId+' 已设为维护中 🔧'); }
+  localStorage.setItem('cat_hotel_maintenance', JSON.stringify(list));
+  renderAll();
+}
+
+function renderBoard(){
+  renderRoomGrid(document.getElementById('gridLarge'), ROOMS.large, false);
+  renderRoomGrid(document.getElementById('gridSmall'), ROOMS.small, false);
+  renderRoomGrid(document.getElementById('gridVip'), ROOMS.vip, true);
+}
+
+/* ============ 渲染：接送时间横幅 ============ */
+function renderPickup(){
+  const wrap = document.getElementById('pickupWrap');
+  const today = new Date();
+  const items = [];
+  for(const b of bookings){
+    const ci = parseDT(b.checkIn);
+    const co = b.checkOut?parseDT(b.checkOut):null;
+    if(ci && sameDay(ci, today)) items.push({type:'in', time:ci, booking:b});
+    if(co && sameDay(co, today)) items.push({type:'out', time:co, booking:b});
+  }
+  items.sort((a,b)=>a.time-b.time);
+
+  if(items.length===0){
+    wrap.innerHTML = '<div class="pickup-empty"><span class="emoji">😴</span><div class="text">今天没有接送安排，休息一下吧~</div></div>';
+    return;
+  }
+
+  const now = new Date();
+  const scroll = document.createElement('div');
+  scroll.className = 'pickup-scroll';
+  for(const it of items){
+    const isUrgent = it.time > now && (it.time - now) < 3600000;
+    const card = document.createElement('div');
+    card.className = 'pickup-card ' + (isUrgent?'urgent':it.type);
+    const hh = String(it.time.getHours()).padStart(2,'0');
+    const mm = String(it.time.getMinutes()).padStart(2,'0');
+    const dir = it.type==='in' ? '⬆️ 入店' : '⬇️ 离店';
+    let countdown = '';
+    if(it.time > now){
+      const diff = it.time - now;
+      const h = Math.floor(diff/3600000);
+      const m = Math.floor((diff%3600000)/60000);
+      countdown = `还有 ${h}时${m}分`;
+    } else {
+      countdown = '已到时间';
+    }
+    card.innerHTML = `
+      <div class="pickup-dir ${isUrgent?'urgent':it.type}">${dir}${isUrgent?' 🔔':''}</div>
+      <div class="pickup-time">${hh}:${mm}</div>
+      <div class="pickup-cat">🐱 ${it.booking.catName}</div>
+      <div class="pickup-info">
+        <span class="tag">${it.booking.roomId}</span>
+        <span class="tag">${it.booking.ownerName}</span>
+        <span class="tag">${it.booking.phone.slice(-4)}</span>
+      </div>
+      <div class="pickup-countdown">${countdown}</div>
+    `;
+    card.onclick = ()=>openRoomDetail(it.booking.roomId, it.booking.id);
+    scroll.appendChild(card);
+  }
+  wrap.innerHTML = '';
+  wrap.appendChild(scroll);
+}
+
+/* ============ 渲染：本周接送 ============ */
+function renderWeekList(){
+  const body = document.getElementById('weekListBody');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate()+7);
+  const items = [];
+  for(const b of bookings){
+    const ci = parseDT(b.checkIn);
+    const co = b.checkOut?parseDT(b.checkOut):null;
+    if(ci && ci>=today && ci<weekEnd) items.push({type:'in', time:ci, booking:b});
+    if(co && co>=today && co<weekEnd) items.push({type:'out', time:co, booking:b});
+  }
+  items.sort((a,b)=>a.time-b.time);
+  if(items.length===0){ document.getElementById('weekList').style.display='none'; return; }
+  document.getElementById('weekList').style.display='block';
+  body.innerHTML = items.map(it=>{
+    const icon = it.type==='in'?'⬆️':'⬇️';
+    const dt = (it.time.getMonth()+1)+'/'+it.time.getDate();
+    const tm = String(it.time.getHours()).padStart(2,'0')+':'+String(it.time.getMinutes()).padStart(2,'0');
+    return `<div class="week-item"><span class="w-date">${dt}</span><span class="w-icon">${icon}</span><span class="w-cat">${it.booking.catName}</span><span class="w-time">${tm}</span></div>`;
+  }).join('');
+}
+
+/* ============ 渲染：全部 ============ */
+function renderAll(){
+  const today = new Date();
+  document.getElementById('todayLabel').textContent = (today.getMonth()+1)+'月'+today.getDate()+'日';
+  renderStats();
+  renderDateBar();
+  renderBoard();
+  renderPickup();
+  renderWeekList();
+}
+
+/* ============ 房间详情 ============ */
+function openRoomDetail(roomId, highlightBookingId){
+  const room = [...ROOMS.large,...ROOMS.small,...ROOMS.vip].find(r=>r.id===roomId);
+  const date = selectedDate;
+  const s = getRoomStatus(roomId, date);
+  document.getElementById('detailTitle').innerHTML = `📋 ${room.id} · ${room.type}`;
+
+  let html = '';
+  const list = bookings.filter(b=>b.roomId===roomId);
+  if(list.length===0){
+    html += `<div class="detail-card" style="text-align:center;color:var(--text-light)">
+      <div style="font-size:36px;margin-bottom:6px">🟢</div>
+      <div>该房间暂无预定</div>
+    </div>`;
+  } else {
+    for(const b of list){
+      const ci = parseDT(b.checkIn);
+      const co = b.checkOut?parseDT(b.checkOut):null;
+      const isHl = b.id===highlightBookingId;
+      html += `<div class="detail-card" ${isHl?'style="border:2px solid var(--primary)"':''}>
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px">🐱 ${b.catName} <span style="font-size:12px;color:var(--text-light);font-weight:400">· ${b.breed}</span></div>
+        <div class="detail-row"><span class="label">主人</span><span class="val">${b.ownerName}</span></div>
+        <div class="detail-row"><span class="label">电话</span><span class="val"><a href="tel:${b.phone}" style="color:var(--primary)">${b.phone}</a></span></div>
+        <div class="detail-row"><span class="label">年龄</span><span class="val">${b.age.value}${b.age.unit}</span></div>
+        <div class="detail-row"><span class="label">体重</span><span class="val">${b.weight||'-'} kg</span></div>
+        <div class="detail-row"><span class="label">疫苗</span><span class="val">${b.vaccine}</span></div>
+        <div class="detail-row"><span class="label">绝育</span><span class="val">${b.neutered}</span></div>
+        <div class="detail-row"><span class="label">健康</span><span class="val">${b.health.join('、')}</span></div>
+        <div class="detail-row"><span class="label">入住</span><span class="val">${ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-'}</span></div>
+        <div class="detail-row"><span class="label">退房</span><span class="val">${co?co.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'未定'}</span></div>
+        <div class="detail-row"><span class="label">送店</span><span class="val">${b.delivery}</span></div>
+        ${b.address?`<div class="detail-row"><span class="label">地址</span><span class="val">${b.address}</span></div>`:''}
+        ${b.notes?`<div class="detail-row"><span class="label">注意</span><span class="val" style="max-width:60%;text-align:right">${b.notes}</span></div>`:''}
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-ghost" style="font-size:13px;padding:8px" onclick="editBooking('${b.id}')">✏️ 编辑</button>
+          <button class="btn btn-danger" style="font-size:13px;padding:8px;flex:0 0 auto" onclick="delBooking('${b.id}')">🗑 删除</button>
+        </div>
+      </div>`;
+    }
+  }
+  html += `<div style="padding:0 16px 16px"><button class="btn btn-primary" onclick="openForm(null,'${roomId}')">＋ 为 ${roomId} 新建预定</button></div>`;
+  document.getElementById('detailBody').innerHTML = html;
+  document.getElementById('detailOverlay').classList.add('show');
+}
+
+function delBooking(id){
+  if(!confirm('确定删除这条预定吗？')) return;
+  bookings = bookings.filter(b=>b.id!==id);
+  saveData();
+  closeOverlay('detailOverlay');
+  renderAll();
+  toast('已删除 🗑');
+}
+
+function editBooking(id){
+  const b = bookings.find(x=>x.id===id);
+  if(!b) return;
+  closeOverlay('detailOverlay');
+  openForm(b);
+}
+
+/* ============ 表单 ============ */
+function openForm(booking, presetRoom){
+  // 重置
+  formState = { ageUnit:'岁', vaccine:'', neuter:'', health:[], roomType:'', delivery:'', editId:null, presetRoom:null };
+  document.getElementById('f_ownerName').value='';
+  document.getElementById('f_phone').value='';
+  document.getElementById('f_catName').value='';
+  document.getElementById('f_breed').value='布偶';
+  document.getElementById('f_age').value='';
+  document.getElementById('f_weight').value='';
+  document.getElementById('f_notes').value='';
+  document.getElementById('f_address').value='';
+  document.getElementById('f_checkIn').value='';
+  document.getElementById('f_checkOut').value='';
+  // 重置标签
+  document.querySelectorAll('.tag-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('ageUnit_岁').classList.add('active');
+  document.getElementById('addrField').style.display='none';
+  document.getElementById('formTitle').textContent = '📝 新建预定';
+
+  if(booking){
+    formState.editId = booking.id;
+    document.getElementById('formTitle').textContent = '✏️ 编辑预定';
+    document.getElementById('f_ownerName').value = booking.ownerName;
+    document.getElementById('f_phone').value = booking.phone;
+    document.getElementById('f_catName').value = booking.catName;
+    document.getElementById('f_breed').value = booking.breed;
+    document.getElementById('f_age').value = booking.age.value;
+    document.getElementById('f_weight').value = booking.weight||'';
+    document.getElementById('f_notes').value = booking.notes||'';
+    document.getElementById('f_address').value = booking.address||'';
+    const ci = parseDT(booking.checkIn);
+    const co = booking.checkOut?parseDT(booking.checkOut):null;
+    if(ci) document.getElementById('f_checkIn').value = fmtDateTimeLocal(ci);
+    if(co) document.getElementById('f_checkOut').value = fmtDateTimeLocal(co);
+    formState.ageUnit = booking.age.unit;
+    pickTag('ageUnit', booking.age.unit);
+    formState.vaccine = booking.vaccine;
+    formState.neuter = booking.neutered;
+    formState.health = [...booking.health];
+    formState.roomType = booking.roomType;
+    formState.delivery = booking.delivery;
+    // 标记按钮
+    syncTagBtns();
+  } else if(presetRoom){
+    formState.presetRoom = presetRoom;
+    const room = [...ROOMS.large,...ROOMS.small,...ROOMS.vip].find(r=>r.id===presetRoom);
+    if(room){
+      formState.roomType = room.type;
+      syncTagBtns();
+    }
+  }
+  document.getElementById('formOverlay').classList.add('show');
+}
+
+function syncTagBtns(){
+  // vaccine
+  document.querySelectorAll('#vaccineGroup .tag-btn').forEach(el=>{
+    el.classList.toggle('active', el.textContent===formState.vaccine);
+  });
+  // neuter
+  document.querySelectorAll('#neuterGroup .tag-btn').forEach(el=>{
+    el.classList.toggle('active', el.textContent===formState.neuter);
+  });
+  // health
+  document.querySelectorAll('#healthGroup .tag-btn').forEach(el=>{
+    el.classList.toggle('active', formState.health.includes(el.textContent));
+  });
+  // roomType & delivery - 遍历所有 tag-btn
+  document.querySelectorAll('.tag-btn').forEach(el=>{
+    const t = el.textContent.replace(/^[^\u4e00-\u9fa5]+/,'').trim();
+    if(['大柜','小柜','包房'].includes(t)) el.classList.toggle('active', t===formState.roomType);
+    if(['主人送达','上门接送','顺风车','其他'].includes(t)) el.classList.toggle('active', t===formState.delivery);
+  });
+  // 地址栏
+  document.getElementById('addrField').style.display = (formState.delivery==='上门接送')?'block':'none';
+}
+
+function pickTag(key, val, el){
+  if(key==='ageUnit'){
+    formState.ageUnit = val;
+    document.getElementById('ageUnit_岁').classList.toggle('active', val==='岁');
+    document.getElementById('ageUnit_月').classList.toggle('active', val==='月');
+    return;
+  }
+  if(key==='vaccine') formState.vaccine = val;
+  else if(key==='neuter') formState.neuter = val;
+  else if(key==='roomType') formState.roomType = val;
+  else if(key==='delivery'){
+    formState.delivery = val;
+    document.getElementById('addrField').style.display = (val==='上门接送')?'block':'none';
+  }
+  // 同组单选
+  if(el){
+    const parent = el.parentElement;
+    parent.querySelectorAll('.tag-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+  }
+}
+
+function toggleMulti(key, val, el){
+  const i = formState.health.indexOf(val);
+  if(i>=0){ formState.health.splice(i,1); el.classList.remove('active'); }
+  else { formState.health.push(val); el.classList.add('active'); }
+}
+
+function saveForm(){
+  const ownerName = document.getElementById('f_ownerName').value.trim();
+  const phone = document.getElementById('f_phone').value.trim();
+  const catName = document.getElementById('f_catName').value.trim();
+  const age = parseInt(document.getElementById('f_age').value);
+  const checkIn = document.getElementById('f_checkIn').value;
+  const checkOut = document.getElementById('f_checkOut').value;
+
+  if(!ownerName){ toast('请填写主人姓名'); return; }
+  if(!phone){ toast('请填写联系电话'); return; }
+  if(!catName){ toast('请填写猫咪名字'); return; }
+  if(!age || age<0){ toast('请填写年龄'); return; }
+  if(!formState.roomType){ toast('请选择房型'); return; }
+  if(!checkIn){ toast('请选择入住日期'); return; }
+  if(!formState.vaccine){ toast('请选择疫苗情况'); return; }
+  if(!formState.neuter){ toast('请选择绝育情况'); return; }
+
+  // 选房
+  let roomId = formState.presetRoom;
+  if(!roomId){
+    // 自动分配同类型第一个空闲
+    const roomsByType = formState.roomType==='大柜'?ROOMS.large : formState.roomType==='小柜'?ROOMS.small : ROOMS.vip;
+    const date = parseDT(checkIn) || selectedDate;
+    const free = roomsByType.find(r=>getRoomStatus(r.id, date).status==='free');
+    if(!free){ toast('该房型已满，请换房型'); return; }
+    roomId = free.id;
+  }
+
+  const data = {
+    id: formState.editId || ('b'+Date.now()),
+    ownerName, phone, catName,
+    breed: document.getElementById('f_breed').value,
+    age: { value: age, unit: formState.ageUnit },
+    weight: parseFloat(document.getElementById('f_weight').value)||0,
+    vaccine: formState.vaccine,
+    neutered: formState.neuter,
+    health: formState.health.length?formState.health:['健康'],
+    notes: document.getElementById('f_notes').value.trim(),
+    roomType: formState.roomType,
+    roomId: roomId,
+    checkIn: checkIn,
+    checkOut: checkOut || '',
+    delivery: formState.delivery || '主人送达',
+    address: document.getElementById('f_address').value.trim()
+  };
+
+  if(formState.editId){
+    const i = bookings.findIndex(b=>b.id===formState.editId);
+    if(i>=0) bookings[i] = data;
+  } else {
+    bookings.push(data);
+  }
+  saveData();
+  closeOverlay('formOverlay');
+  // 庆祝
+  document.getElementById('celebrate').classList.add('show');
+  setTimeout(()=>{
+    document.getElementById('celebrate').classList.remove('show');
+    renderAll();
+  }, 1200);
+}
+
+/* ============ 工具 ============ */
+function closeOverlay(id){ document.getElementById(id).classList.remove('show'); }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ============ 倒计时实时刷新 ============ */
+setInterval(()=>{ renderPickup(); }, 30000);
+
+/* ============ 启动 ============ */
+loadData();
+renderAll();
+
+/* ============ PWA Service Worker 注册 ============ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(reg => console.log('[PWA] SW 注册成功', reg.scope))
+      .catch(err => console.log('[PWA] SW 注册失败', err));
+  });
+}
+
+/* ============ iOS 全屏适配：安全区域 ============ */
+// 动态注入 safe-area 样式
+(function(){
+  const style = document.createElement('style');
+  style.textContent = `
+    .header { padding-top: max(12px, env(safe-area-inset-top)); }
+    body { padding-bottom: max(80px, calc(80px + env(safe-area-inset-bottom))); }
+    .fab { bottom: max(20px, calc(20px + env(safe-area-inset-bottom))); }
+    .form-actions { padding-bottom: max(12px, calc(12px + env(safe-area-inset-bottom))); }
+  `;
+  document.head.appendChild(style);
+})();
+
+/* ============ 快捷方式入口：?action=new 直接打开表单 ============ */
+(function(){
+  const params = new URLSearchParams(location.search);
+  if (params.get('action') === 'new') {
+    setTimeout(() => openForm(), 300);
+  }
+})();
+</script>
+</body>
+</html>
