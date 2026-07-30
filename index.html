@@ -247,6 +247,71 @@
     font-size: 13px;
   }
 
+  /* ============ 日历选择器 ============ */
+  .cal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px 4px;
+  }
+  .cal-title {
+    font-size: 15px; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .cal-nav {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--bg); font-size: 20px; font-weight: 700;
+    color: var(--primary); display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .cal-nav:active { background: var(--primary-light); }
+  .cal-grid {
+    display: none; padding: 4px 12px 8px;
+    grid-template-columns: repeat(7, 1fr); gap: 2px;
+  }
+  .cal-grid.show { display: grid; }
+  .cal-weekday {
+    text-align: center; font-size: 11px; color: var(--text-light);
+    padding: 4px 0; font-weight: 600;
+  }
+  .cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: var(--text);
+    border-radius: 50%; transition: all 0.12s;
+    position: relative;
+  }
+  .cal-day.other-month { color: var(--gray-dark); opacity: 0.5; }
+  .cal-day.has-booking::after {
+    content: ""; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: var(--primary);
+  }
+  .cal-day.today { color: var(--primary); font-weight: 800; }
+  .cal-day.today::before {
+    content: "🐾"; position: absolute; top: -2px; right: -2px; font-size: 10px;
+  }
+  .cal-day.selected {
+    background: var(--primary); color: #fff;
+  }
+  .cal-day.selected.has-booking::after { background: #fff; }
+  .cal-day:active { transform: scale(0.9); }
+
+  /* ============ 空房可视化网格 ============ */
+  .avail-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    margin-top: 4px;
+  }
+  .avail-cell {
+    padding: 8px 4px; border-radius: 10px; text-align: center;
+    font-size: 12px; font-weight: 700; transition: all 0.12s;
+    border: 2px solid transparent; position: relative;
+  }
+  .avail-cell.free { background: var(--mint-light); color: #4DA880; }
+  .avail-cell.booked { background: var(--orange-bg); color: #C07030; opacity: 0.6; }
+  .avail-cell.occupied { background: var(--primary-light); color: #A05020; opacity: 0.6; }
+  .avail-cell.maintenance { background: var(--gray); color: var(--gray-dark); opacity: 0.5; }
+  .avail-cell.selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+  .avail-cell:active { transform: scale(0.93); }
+  .avail-cell .ac-label { font-size: 11px; }
+  .avail-cell .ac-status { font-size: 10px; font-weight: 600; opacity: 0.8; }
+
   /* ============ 房型看板 ============ */
   .room-section { padding: 4px 0 16px; }
   .room-grid {
@@ -480,12 +545,24 @@
 
 <!-- ============ 今日预定横幅（重点突出）============ -->
 <div class="pickup-section">
-  <div class="pickup-section-title">📋 今日预定入住</div>
-  <div id="bookingWrap"></div>
+  <div class="pickup-section-title">📦 家长送猫到店</div>
+  <div id="bookingInWrap"></div>
+</div>
+<div class="pickup-section">
+  <div class="pickup-section-title">🎁 家长接猫回家</div>
+  <div id="bookingOutWrap"></div>
 </div>
 
-<!-- ============ 日期条 ============ -->
+<!-- ============ 日期选择（日历 + 快捷条）============ -->
 <div class="date-bar-wrap">
+  <!-- 年月切换 + 日历网格 -->
+  <div class="cal-header">
+    <button class="cal-nav" onclick="calShift(-1)">‹</button>
+    <div class="cal-title" id="calTitle" onclick="calToggleGrid()">📅 </div>
+    <button class="cal-nav" onclick="calShift(1)">›</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+  <!-- 快捷日期条 -->
   <div class="date-scroll" id="dateScroll"></div>
 </div>
 
@@ -613,10 +690,18 @@
           <button class="tag-btn" onclick="pickTag('roomType','包房',this)">👑 包房</button>
         </div>
       </div>
+      <!-- 空房可视化：显示该房型可预订的房间 -->
+      <div class="field" id="availField" style="display:none">
+        <label class="field-label">🟢 可选房间（点击选定）</label>
+        <div id="availGrid" class="avail-grid"></div>
+        <div style="font-size:11px;color:var(--text-light);margin-top:6px">
+          🟢空闲可定 · 📕已预定 · 🐱在住中 · 🔧维护
+        </div>
+      </div>
       <div class="field-row">
         <div class="field">
           <label class="field-label">入住日期 <span class="req">*</span></label>
-          <input type="datetime-local" id="f_checkIn">
+          <input type="datetime-local" id="f_checkIn" onchange="renderAvailGrid()">
         </div>
         <div class="field">
           <label class="field-label">退房日期 <span class="req">*</span></label>
@@ -665,23 +750,29 @@ let formState = {
   roomType: '', delivery: '', editId: null, presetRoom: null
 };
 
-// 房间配置 - 按房间分组
-// 大柜全部在客厅，6个一组；小柜4组共24个，分布在主卧/次卧/客厅
+// 房间配置 - 每组小柜独立编号1~6，ID用区域前缀保证唯一
+// 辅助：生成某区域的6个小柜
+function makeSmallCabin(area){
+  return Array.from({length:6},(_,i)=>({id:area+'-小柜'+(i+1), type:'小柜', area:area, label:'小柜'+(i+1)}));
+}
+
 const ROOMS = {
-  large: Array.from({length:6},(_,i)=>({id:'大柜'+(i+1),type:'大柜'})),
-  small: Array.from({length:24},(_,i)=>({id:'小柜'+(i+1),type:'小柜'})),
-  vip:   Array.from({length:2},(_,i)=>({id:'V'+(i+1),type:'包房'}))
+  large: Array.from({length:6},(_,i)=>({id:'大柜'+(i+1),type:'大柜',label:'大柜'+(i+1)})),
+  vip:   Array.from({length:2},(_,i)=>({id:'V'+(i+1),type:'包房',label:'V'+(i+1)}))
 };
 
-// 看板分区配置
+// 看板分区配置 - 每组小柜重新从1编号
 const BOARD_SECTIONS = [
   { title:'客厅大柜', icon:'🏠', rooms: ROOMS.large, gridClass:'large' },
-  { title:'主卧小柜 · 第1组', icon:'🛏️', rooms: ROOMS.small.slice(0,6), gridClass:'small' },
-  { title:'主卧小柜 · 第2组', icon:'🛏️', rooms: ROOMS.small.slice(6,12), gridClass:'small' },
-  { title:'次卧小柜 · 第3组', icon:'🚪', rooms: ROOMS.small.slice(12,18), gridClass:'small' },
-  { title:'客厅小柜 · 第4组', icon:'🛋️', rooms: ROOMS.small.slice(18,24), gridClass:'small' },
+  { title:'主卧小柜 · 第1组', icon:'🛏️', rooms: makeSmallCabin('主卧1'), gridClass:'small' },
+  { title:'主卧小柜 · 第2组', icon:'🛏️', rooms: makeSmallCabin('主卧2'), gridClass:'small' },
+  { title:'次卧小柜 · 第3组', icon:'🚪', rooms: makeSmallCabin('次卧'), gridClass:'small' },
+  { title:'客厅小柜 · 第4组', icon:'🛋️', rooms: makeSmallCabin('客厅'), gridClass:'small' },
   { title:'包房区', icon:'👑', rooms: ROOMS.vip, gridClass:'vip' }
 ];
+
+// 扁平化所有房间，用于房态计算和表单分配
+const ALL_ROOMS = BOARD_SECTIONS.flatMap(s=>s.rooms);
 
 // 示例数据
 function loadSampleData(){
@@ -718,7 +809,7 @@ function loadSampleData(){
       catName:'团子', breed:'英短', age:{value:1,unit:'岁'}, weight:3.8,
       vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
       notes:'很黏人，喜欢玩毛线球',
-      roomType:'小柜', roomId:'小柜3',
+      roomType:'小柜', roomId:'主卧1-小柜3',
       checkIn:fmt(in3), checkOut:fmt(t2),
       delivery:'顺风车', address:''
     }
@@ -778,7 +869,7 @@ function getRoomStatus(roomId, date){
 /* ============ 渲染：统计条 ============ */
 function renderStats(){
   let free=0, occ=0, book=0;
-  const allRooms = [...ROOMS.large, ...ROOMS.small, ...ROOMS.vip];
+  const allRooms = ALL_ROOMS;
   for(const r of allRooms){
     const s = getRoomStatus(r.id, selectedDate);
     if(s.status==='free') free++;
@@ -790,8 +881,88 @@ function renderStats(){
   document.getElementById('statBook').textContent = book;
 }
 
-/* ============ 渲染：日期条 ============ */
+/* ============ 渲染：日历选择器 + 日期条 ============ */
+let calVisible = false; // 日历网格是否展开
+let calMonth = new Date(); // 当前查看的月份
+
+function calToggleGrid(){
+  calVisible = !calVisible;
+  renderCalendar();
+}
+function calShift(delta){
+  calMonth.setMonth(calMonth.getMonth()+delta);
+  renderCalendar();
+}
+
+function renderCalendar(){
+  // 标题
+  document.getElementById('calTitle').textContent = '📅 '+calMonth.getFullYear()+'年'+(calMonth.getMonth()+1)+'月';
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  grid.classList.toggle('show', calVisible);
+  if(!calVisible) return;
+
+  // 星期表头
+  const weekdays = ['日','一','二','三','四','五','六'];
+  for(const w of weekdays){
+    const el = document.createElement('div');
+    el.className = 'cal-weekday';
+    el.textContent = w;
+    grid.appendChild(el);
+  }
+
+  // 计算当月第一天是星期几
+  const year = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // 上个月补位
+  const prevDays = new Date(year, month, 0).getDate();
+  for(let i=startWeekday-1; i>=0; i--){
+    const d = new Date(year, month-1, prevDays-i);
+    const cell = makeCalCell(d, true, today);
+    grid.appendChild(cell);
+  }
+  // 当月
+  for(let i=1; i<=daysInMonth; i++){
+    const d = new Date(year, month, i);
+    const cell = makeCalCell(d, false, today);
+    grid.appendChild(cell);
+  }
+  // 下个月补位到 42 格
+  const filled = startWeekday + daysInMonth;
+  const remain = (filled <= 35) ? (35-filled) : (42-filled);
+  for(let i=1; i<=remain; i++){
+    const d = new Date(year, month+1, i);
+    const cell = makeCalCell(d, true, today);
+    grid.appendChild(cell);
+  }
+}
+
+function makeCalCell(d, otherMonth, today){
+  const cell = document.createElement('div');
+  cell.className = 'cal-day';
+  if(otherMonth) cell.classList.add('other-month');
+  if(sameDay(d, today)) cell.classList.add('today');
+  if(sameDay(d, selectedDate)) cell.classList.add('selected');
+  // 是否有预定
+  const hasBook = bookings.some(b=>{
+    const ci=parseDT(b.checkIn); if(!ci) return false;
+    const co=b.checkOut?parseDT(b.checkOut):null;
+    return ci <= new Date(d.getTime()+86399999) && (!co || co >= d);
+  });
+  if(hasBook) cell.classList.add('has-booking');
+  cell.textContent = d.getDate();
+  cell.onclick = ()=>{ selectedDate = d; calMonth = new Date(d); renderAll(); };
+  return cell;
+}
+
 function renderDateBar(){
+  renderCalendar();
+  // 快捷日期条（未来14天）
   const scroll = document.getElementById('dateScroll');
   scroll.innerHTML = '';
   const today = new Date(); today.setHours(0,0,0,0);
@@ -801,7 +972,6 @@ function renderDateBar(){
     chip.className = 'date-chip';
     if(sameDay(d, selectedDate)) chip.classList.add('active');
     if(sameDay(d, today)) chip.classList.add('today');
-    // 该日是否有预定
     const hasBook = bookings.some(b=>{
       const ci=parseDT(b.checkIn); if(!ci) return false;
       const co=b.checkOut?parseDT(b.checkOut):null;
@@ -809,7 +979,7 @@ function renderDateBar(){
     });
     if(hasBook) chip.classList.add('has-booking');
     chip.innerHTML = `<div class="weekday">${i===0?'今天':'周'+WD[d.getDay()]}</div><div class="day">${d.getDate()}</div><div class="dot"></div>`;
-    chip.onclick = ()=>{ selectedDate = d; renderAll(); };
+    chip.onclick = ()=>{ selectedDate = d; calMonth = new Date(d); renderAll(); };
     scroll.appendChild(chip);
   }
 }
@@ -827,9 +997,9 @@ function renderRoomGrid(gridEl, rooms, isVip){
     else if(s.status==='maintenance'){ icon='🔧'; label='维护'; }
 
     if(isVip){
-      card.innerHTML = `<div class="room-icon">${icon}</div><div class="vip-info"><div class="room-id">${r.id} · ${r.type}</div><div class="room-cat">${label}</div></div>`;
+      card.innerHTML = `<div class="room-icon">${icon}</div><div class="vip-info"><div class="room-id">${r.label||r.id} · ${r.type}</div><div class="room-cat">${label}</div></div>`;
     } else {
-      card.innerHTML = `<div class="room-icon">${icon}</div><div class="room-id">${r.id}</div><div class="room-cat">${label}</div>`;
+      card.innerHTML = `<div class="room-icon">${icon}</div><div class="room-id">${r.label||r.id}</div><div class="room-cat">${label}</div>`;
     }
     card.onclick = ()=>openRoomDetail(r.id);
     card.oncontextmenu = (e)=>{ e.preventDefault(); toggleMaintenance(r.id); };
@@ -896,7 +1066,7 @@ function renderPickup(){
     card.className = 'pickup-card ' + (isUrgent?'urgent':it.type);
     const hh = String(it.time.getHours()).padStart(2,'0');
     const mm = String(it.time.getMinutes()).padStart(2,'0');
-    const dir = it.type==='in' ? '⬆️ 入店' : '⬇️ 离店';
+    const dir = it.type==='in' ? '🚗 店铺接猫入店' : '🏠 店铺送猫回家';
     let countdown = '';
     if(it.time > now){
       const diff = it.time - now;
@@ -924,46 +1094,35 @@ function renderPickup(){
   wrap.appendChild(scroll);
 }
 
-/* ============ 渲染：今日预定横幅（重点突出）============ */
-function renderBooking(){
-  const wrap = document.getElementById('bookingWrap');
-  const today = new Date();
-  const items = bookings.filter(b=>{
-    const ci = parseDT(b.checkIn);
-    return ci && sameDay(ci, today);
-  });
-  items.sort((a,b)=>{
-    const ta=parseDT(a.checkIn), tb=parseDT(b.checkIn);
-    return ta-tb;
-  });
-
+/* ============ 渲染：预定横幅（家长送猫到店 / 家长接猫回家）============ */
+function renderBookingCard(wrapId, items, dirText, dirIcon, emptyEmoji, emptyText){
+  const wrap = document.getElementById(wrapId);
   if(items.length===0){
-    wrap.innerHTML = '<div class="pickup-empty"><span class="emoji">📋</span><div class="text">今天没有预定入住</div></div>';
+    wrap.innerHTML = `<div class="pickup-empty"><span class="emoji">${emptyEmoji}</span><div class="text">${emptyText}</div></div>`;
     return;
   }
-
   const now = new Date();
   const scroll = document.createElement('div');
   scroll.className = 'pickup-scroll';
   for(const b of items){
-    const ci = parseDT(b.checkIn);
-    const isUrgent = ci > now && (ci - now) < 3600000;
-    const isArrived = ci <= now;
+    const time = parseDT(dirIcon==='in' ? b.checkIn : b.checkOut);
+    const isUrgent = time > now && (time - now) < 3600000;
+    const isDone = time <= now;
     const card = document.createElement('div');
-    card.className = 'pickup-card booking-card' + (isUrgent?' urgent':'') + (isArrived?' arrived':'');
-    const hh = String(ci.getHours()).padStart(2,'0');
-    const mm = String(ci.getMinutes()).padStart(2,'0');
+    card.className = 'pickup-card booking-card' + (isUrgent?' urgent':'') + (isDone?' arrived':'');
+    const hh = String(time.getHours()).padStart(2,'0');
+    const mm = String(time.getMinutes()).padStart(2,'0');
     let countdown = '';
-    if(isArrived){
-      countdown = '✅ 已到店';
-    } else if(ci > now){
-      const diff = ci - now;
+    if(isDone){
+      countdown = dirIcon==='in' ? '✅ 已到店' : '✅ 已接走';
+    } else if(time > now){
+      const diff = time - now;
       const h = Math.floor(diff/3600000);
       const m = Math.floor((diff%3600000)/60000);
-      countdown = `还有 ${h}时${m}分入住`;
+      countdown = `还有 ${h}时${m}分`;
     }
     card.innerHTML = `
-      <div class="pickup-dir booking">📋 预定入住${isUrgent?' 🔔':''}</div>
+      <div class="pickup-dir booking">${dirText}${isUrgent?' 🔔':''}</div>
       <div class="pickup-time">${hh}:${mm}</div>
       <div class="pickup-cat">🐱 ${b.catName} <span style="font-size:11px;font-weight:400;opacity:0.7">${b.breed}</span></div>
       <div class="pickup-info">
@@ -978,6 +1137,23 @@ function renderBooking(){
   }
   wrap.innerHTML = '';
   wrap.appendChild(scroll);
+}
+
+function renderBooking(){
+  const today = new Date();
+  // 家长送猫到店 = 今天入住的
+  const inItems = bookings.filter(b=>{
+    const ci = parseDT(b.checkIn);
+    return ci && sameDay(ci, today);
+  }).sort((a,b)=>parseDT(a.checkIn)-parseDT(b.checkIn));
+  // 家长接猫回家 = 今天退房的
+  const outItems = bookings.filter(b=>{
+    const co = b.checkOut?parseDT(b.checkOut):null;
+    return co && sameDay(co, today);
+  }).sort((a,b)=>parseDT(a.checkOut)-parseDT(b.checkOut));
+
+  renderBookingCard('bookingInWrap', inItems, '📦 家长送猫到店', 'in', '📦', '今天没有家长送猫到店');
+  renderBookingCard('bookingOutWrap', outItems, '🎁 家长接猫回家', 'out', '🎁', '今天没有家长接猫回家');
 }
 
 /* ============ 渲染：本周接送 ============ */
@@ -1017,7 +1193,7 @@ function renderAll(){
 
 /* ============ 房间详情 ============ */
 function openRoomDetail(roomId, highlightBookingId){
-  const room = [...ROOMS.large,...ROOMS.small,...ROOMS.vip].find(r=>r.id===roomId);
+  const room = ALL_ROOMS.find(r=>r.id===roomId);
   const date = selectedDate;
   const s = getRoomStatus(roomId, date);
   document.getElementById('detailTitle').innerHTML = `📋 ${room.id} · ${room.type}`;
@@ -1094,6 +1270,7 @@ function openForm(booking, presetRoom){
   document.querySelectorAll('.tag-btn').forEach(el=>el.classList.remove('active'));
   document.getElementById('ageUnit_岁').classList.add('active');
   document.getElementById('addrField').style.display='none';
+  document.getElementById('availField').style.display='none';
   document.getElementById('formTitle').textContent = '📝 新建预定';
 
   if(booking){
@@ -1122,13 +1299,49 @@ function openForm(booking, presetRoom){
     syncTagBtns();
   } else if(presetRoom){
     formState.presetRoom = presetRoom;
-    const room = [...ROOMS.large,...ROOMS.small,...ROOMS.vip].find(r=>r.id===presetRoom);
+    const room = ALL_ROOMS.find(r=>r.id===presetRoom);
     if(room){
       formState.roomType = room.type;
       syncTagBtns();
     }
   }
   document.getElementById('formOverlay').classList.add('show');
+}
+
+/* ============ 空房可视化 ============ */
+function renderAvailGrid(){
+  const field = document.getElementById('availField');
+  const grid = document.getElementById('availGrid');
+  if(!formState.roomType){ field.style.display='none'; return; }
+  field.style.display = 'block';
+
+  // 用入住日期判断房态，没选则用 selectedDate
+  const checkInVal = document.getElementById('f_checkIn').value;
+  const date = checkInVal ? parseDT(checkInVal) : selectedDate;
+
+  const rooms = ALL_ROOMS.filter(r=>r.type===formState.roomType);
+  grid.innerHTML = '';
+  for(const r of rooms){
+    const s = getRoomStatus(r.id, date);
+    const cell = document.createElement('div');
+    cell.className = 'avail-cell '+s.status;
+    if(formState.presetRoom===r.id) cell.classList.add('selected');
+    let statusText = '空闲';
+    if(s.status==='booked') statusText = s.booking.catName;
+    else if(s.status==='occupied') statusText = s.booking.catName;
+    else if(s.status==='maintenance') statusText = '维护';
+    cell.innerHTML = `<div class="ac-label">${r.label||r.id}</div><div class="ac-status">${statusText}</div>`;
+    if(s.status==='free'){
+      cell.onclick = ()=>{
+        formState.presetRoom = r.id;
+        renderAvailGrid();
+        toast('已选 '+r.label);
+      };
+    } else {
+      cell.style.cursor = 'not-allowed';
+    }
+    grid.appendChild(cell);
+  }
 }
 
 function syncTagBtns(){
@@ -1152,6 +1365,8 @@ function syncTagBtns(){
   });
   // 地址栏
   document.getElementById('addrField').style.display = (formState.delivery==='上门接送')?'block':'none';
+  // 空房可视化
+  renderAvailGrid();
 }
 
 function pickTag(key, val, el){
@@ -1163,7 +1378,11 @@ function pickTag(key, val, el){
   }
   if(key==='vaccine') formState.vaccine = val;
   else if(key==='neuter') formState.neuter = val;
-  else if(key==='roomType') formState.roomType = val;
+  else if(key==='roomType'){
+    formState.roomType = val;
+    formState.presetRoom = null; // 切换房型时清除已选房间
+    renderAvailGrid();
+  }
   else if(key==='delivery'){
     formState.delivery = val;
     document.getElementById('addrField').style.display = (val==='上门接送')?'block':'none';
@@ -1203,7 +1422,7 @@ function saveForm(){
   let roomId = formState.presetRoom;
   if(!roomId){
     // 自动分配同类型第一个空闲
-    const roomsByType = formState.roomType==='大柜'?ROOMS.large : formState.roomType==='小柜'?ROOMS.small : ROOMS.vip;
+    const roomsByType = ALL_ROOMS.filter(r=>r.type===formState.roomType);
     const date = parseDT(checkIn) || selectedDate;
     const free = roomsByType.find(r=>getRoomStatus(r.id, date).status==='free');
     if(!free){ toast('该房型已满，请换房型'); return; }
