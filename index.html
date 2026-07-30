@@ -136,6 +136,11 @@
     box-shadow: var(--shadow);
     transition: transform 0.15s;
   }
+  /* 并排模式：卡片宽度自适应，字号缩小 */
+  .pickup-card.compact { width: 100%; padding: 10px; }
+  .pickup-card.compact .pickup-time { font-size: 22px; }
+  .pickup-card.compact .pickup-dir { font-size: 11px; }
+  .pickup-card.compact .pickup-cat { font-size: 13px; }
   .pickup-card:active { transform: scale(0.97); }
   .pickup-card.in { background: linear-gradient(135deg, #FFF0E0 0%, #FFE0C8 100%); }
   .pickup-card.out { background: linear-gradient(135deg, #E8F7EE 0%, #D0F0DC 100%); }
@@ -502,6 +507,25 @@
   }
   .toast.show { opacity: 1; }
 
+  /* ============ 自动匹配提示 ============ */
+  .match-list {
+    display: none; position: absolute; left: 0; right: 0; top: 100%;
+    z-index: 50; background: #fff; border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 16px rgba(93,78,60,0.15); overflow: hidden;
+    max-height: 240px; overflow-y: auto;
+  }
+  .match-list.show { display: block; }
+  .match-item {
+    padding: 10px 12px; border-bottom: 1px solid var(--gray);
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .match-item:active { background: var(--bg); }
+  .match-item:last-child { border-bottom: none; }
+  .match-item .mi-cat { font-weight: 700; font-size: 13px; color: var(--text); }
+  .match-item .mi-info { font-size: 11px; color: var(--text-light); flex: 1; }
+  .match-item .mi-badge { font-size: 10px; color: var(--primary); background: var(--primary-light); padding: 2px 6px; border-radius: 8px; font-weight: 600; }
+
   /* ============ 本周接送列表 ============ */
   .week-list {
     margin: 0 16px 16px; background: var(--card-bg);
@@ -566,11 +590,19 @@
   <div id="pickupWrap"></div>
 </div>
 
-<!-- ============ 家长送猫/接猫横幅（并排）============ -->
+<!-- ============ 家长送猫/接猫横幅（左右并排）============ -->
 <div class="pickup-section">
   <div class="pickup-section-title">👨‍👩‍👧 家长送猫/接猫</div>
-  <div id="bookingInWrap"></div>
-  <div id="bookingOutWrap" style="margin-top:10px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#7B5FBE;margin-bottom:4px;padding-left:2px">📦 送猫到店</div>
+      <div id="bookingInWrap"></div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#4DA880;margin-bottom:4px;padding-left:2px">🎁 接猫回家</div>
+      <div id="bookingOutWrap"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ============ 日期选择（日历 + 快捷条）============ -->
@@ -586,9 +618,10 @@
   <div class="date-scroll" id="dateScroll"></div>
 </div>
 
-<!-- 一周房态总览按钮 -->
-<div style="padding:4px 16px 0">
-  <button class="btn btn-primary" style="width:100%;padding:11px;font-size:14px" onclick="openWeekView()">📊 一周房态总览（一眼看哪天空房）</button>
+<!-- 快捷功能按钮 -->
+<div style="padding:4px 16px 0;display:flex;gap:8px">
+  <button class="btn btn-primary" style="flex:1;padding:11px;font-size:13px" onclick="openWeekView()">📊 一周房态</button>
+  <button class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;border-color:var(--primary);color:var(--primary)" onclick="openCustomerDB()">🔍 客户信息库</button>
 </div>
 
 <!-- ============ 房型看板（动态渲染分区）============ -->
@@ -630,6 +663,18 @@
   </div>
 </div>
 
+<!-- ============ 客户信息库浮层 ============ -->
+<div class="overlay" id="custOverlay" onclick="if(event.target===this)closeOverlay('custOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">🔍 客户信息库</div>
+    <div style="padding:0 16px 12px">
+      <input type="text" id="custSearch" placeholder="搜索猫咪名 / 主人名 / 手机号…" style="width:100%;border:2px solid var(--gray);border-radius:24px;padding:11px 16px;font-size:14px" oninput="renderCustList()">
+    </div>
+    <div id="custBody"></div>
+  </div>
+</div>
+
 <!-- ============ 表单浮层 ============ -->
 <div class="overlay" id="formOverlay" onclick="if(event.target===this)closeOverlay('formOverlay')">
   <div class="sheet">
@@ -639,17 +684,18 @@
     <!-- 基础信息 -->
     <div class="form-section">
       <div class="form-section-title">🐱 基础信息</div>
-      <div class="field">
+      <div class="field" style="position:relative">
         <label class="field-label">主人姓名 <span class="req">*</span></label>
-        <input type="text" id="f_ownerName" placeholder="请输入主人姓名">
+        <input type="text" id="f_ownerName" placeholder="请输入主人姓名" oninput="autoMatch()">
+        <div id="matchList" class="match-list"></div>
       </div>
       <div class="field">
         <label class="field-label">联系电话 <span class="req">*</span></label>
-        <input type="tel" id="f_phone" placeholder="11位手机号" maxlength="11">
+        <input type="tel" id="f_phone" placeholder="11位手机号" maxlength="11" oninput="autoMatch()">
       </div>
       <div class="field">
         <label class="field-label">猫咪名字 <span class="req">*</span></label>
-        <input type="text" id="f_catName" placeholder="猫咪的名字">
+        <input type="text" id="f_catName" placeholder="猫咪的名字" oninput="autoMatch()">
       </div>
       <div class="field">
         <label class="field-label">猫咪品种</label>
@@ -793,7 +839,7 @@
 
 <script>
 /* ============ 数据层 ============ */
-const STORAGE_KEY = 'cat_hotel_bookings_v2';
+const STORAGE_KEY = 'cat_hotel_bookings_v3';
 let bookings = [];
 let selectedDate = new Date();
 let formState = {
@@ -802,25 +848,19 @@ let formState = {
   roomType: '', delivery: '', editId: null, presetRoom: null
 };
 
-// 房间配置 - 每组小柜独立编号1~6，ID用区域前缀保证唯一
-// 辅助：生成某区域的6个小柜
-function makeSmallCabin(area){
-  return Array.from({length:6},(_,i)=>({id:area+'-小柜'+(i+1), type:'小柜', area:area, label:'小柜'+(i+1)}));
+// 房间配置 - 按区域分类，每组独立编号
+// 辅助：生成某区域N个柜子
+function makeCabins(area, type, count){
+  return Array.from({length:count},(_,i)=>({id:area+'-'+type+(i+1), type:type, area:area, label:type+(i+1)}));
 }
 
-const ROOMS = {
-  large: Array.from({length:6},(_,i)=>({id:'大柜'+(i+1),type:'大柜',label:'大柜'+(i+1)})),
-  vip:   Array.from({length:2},(_,i)=>({id:'V'+(i+1),type:'包房',label:'V'+(i+1)}))
-};
-
-// 看板分区配置 - 每组小柜重新从1编号
+// 看板分区配置
 const BOARD_SECTIONS = [
-  { title:'客厅大柜', icon:'🏠', rooms: ROOMS.large, gridClass:'large' },
-  { title:'主卧小柜 · 第1组', icon:'🛏️', rooms: makeSmallCabin('主卧1'), gridClass:'small' },
-  { title:'主卧小柜 · 第2组', icon:'🛏️', rooms: makeSmallCabin('主卧2'), gridClass:'small' },
-  { title:'次卧小柜 · 第3组', icon:'🚪', rooms: makeSmallCabin('次卧'), gridClass:'small' },
-  { title:'客厅小柜 · 第4组', icon:'🛋️', rooms: makeSmallCabin('客厅'), gridClass:'small' },
-  { title:'包房区', icon:'👑', rooms: ROOMS.vip, gridClass:'vip' }
+  { title:'客厅大柜', icon:'🏠', rooms: makeCabins('客厅大柜','大柜',6), gridClass:'large', areaKey:'客厅大柜' },
+  { title:'主卧小柜', icon:'🛏️', rooms: makeCabins('主卧小柜','小柜',12), gridClass:'small', areaKey:'主卧小柜' },
+  { title:'客厅小柜', icon:'🛋️', rooms: makeCabins('客厅小柜','小柜',12), gridClass:'small', areaKey:'客厅小柜' },
+  { title:'次卧小柜', icon:'🚪', rooms: makeCabins('次卧小柜','小柜',6), gridClass:'small', areaKey:'次卧小柜' },
+  { title:'包房区', icon:'👑', rooms: makeCabins('包房','包房',2), gridClass:'vip', areaKey:'包房' }
 ];
 
 // 扁平化所有房间，用于房态计算和表单分配
@@ -843,7 +883,7 @@ function loadSampleData(){
       catName:'咪咪', breed:'布偶', age:{value:2,unit:'岁'}, weight:4.5,
       vaccine:'已完整接种', neutered:'已绝育', deworm:'已驱虫', health:['健康'],
       notes:'怕生，不要和其他猫接触',
-      roomType:'大柜', roomId:'大柜1',
+      roomType:'大柜', roomId:'客厅大柜-大柜1',
       checkIn:fmt(t), checkOut:fmt(out1),
       delivery:'主人送达', address:''
     },
@@ -852,7 +892,7 @@ function loadSampleData(){
       catName:'橘子', breed:'橘猫', age:{value:5,unit:'岁'}, weight:6.2,
       vaccine:'部分接种', neutered:'未绝育', deworm:'未驱虫', health:['需服药','特殊护理'],
       notes:'每天需服药，有过敏体质',
-      roomType:'包房', roomId:'V1',
+      roomType:'包房', roomId:'包房-包房1',
       checkIn:fmt(tom), checkOut:'',
       delivery:'上门接送', address:'朝阳区xx路123号'
     },
@@ -861,7 +901,7 @@ function loadSampleData(){
       catName:'团子', breed:'英短', age:{value:1,unit:'岁'}, weight:3.8,
       vaccine:'已完整接种', neutered:'已绝育', deworm:'部分驱虫', health:['健康'],
       notes:'很黏人，喜欢玩毛线球',
-      roomType:'小柜', roomId:'主卧1-小柜3',
+      roomType:'小柜', roomId:'主卧小柜-小柜3',
       checkIn:fmt(in3), checkOut:fmt(t2),
       delivery:'顺风车', address:''
     }
@@ -958,25 +998,31 @@ function showStatList(type){
     html += '<div class="detail-card" style="text-align:center;color:var(--text-light);padding:30px"><div style="font-size:36px;margin-bottom:6px">🐱</div>暂无</div>';
   } else {
     if(type==='free'){
-      // 空闲：显示房间名 + 该房间未来7天可用情况
-      html += '<div style="padding:0 16px 10px;font-size:11px;color:var(--text-light)">💡 点击房间可查看未来7天空闲时段</div>';
-      for(const it of items){
-        const r = it.room;
-        // 计算未来7天哪些天空闲
-        let freeDays = [];
-        const today = new Date(); today.setHours(0,0,0,0);
-        for(let i=0;i<7;i++){
-          const d = new Date(today); d.setDate(d.getDate()+i);
-          const st = getRoomStatus(r.id, d);
-          if(st.status==='free') freeDays.push(d.getDate()+'日');
+      // 空闲：按区域分类显示
+      html += '<div style="padding:0 16px 10px;font-size:11px;color:var(--text-light)">💡 点击房间可查看详情</div>';
+      const today = new Date(); today.setHours(0,0,0,0);
+      // 按区域分组
+      for(const sec of BOARD_SECTIONS){
+        const secFreeItems = items.filter(it=>it.room.area===sec.areaKey);
+        if(secFreeItems.length===0) continue;
+        html += `<div style="padding:8px 16px 4px;font-size:13px;font-weight:700;color:var(--text)">${sec.icon} ${sec.title} <span style="font-size:11px;color:var(--mint);font-weight:600">${secFreeItems.length}间空闲</span></div>`;
+        // 网格显示该区域空闲房间
+        html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px 16px 8px">';
+        for(const it of secFreeItems){
+          const r = it.room;
+          // 计算未来7天空闲天数
+          let freeCnt = 0;
+          for(let i=0;i<7;i++){
+            const d = new Date(today); d.setDate(d.getDate()+i);
+            if(getRoomStatus(r.id, d).status==='free') freeCnt++;
+          }
+          html += `<div class="detail-card" onclick="openRoomDetail('${r.id}')" style="cursor:pointer;padding:10px 6px;text-align:center;margin:0">
+            <div style="font-size:18px">🟢</div>
+            <div style="font-weight:700;font-size:13px;margin-top:2px">${r.label}</div>
+            <div style="font-size:10px;color:${freeCnt>=5?'var(--mint)':freeCnt>=3?'var(--primary)':'var(--pink-red)'};font-weight:700;margin-top:2px">${freeCnt}/7天</div>
+          </div>`;
         }
-        html += `<div class="detail-card" onclick="openRoomDetail('${r.id}')" style="cursor:pointer">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><span style="font-size:18px">🟢</span> <strong>${r.label||r.id}</strong> <span style="font-size:11px;color:var(--text-light)">${r.type}</span></div>
-            <span style="font-size:12px;color:var(--mint);font-weight:700">${freeDays.length}/7天空闲</span>
-          </div>
-          ${freeDays.length>0 ? `<div style="margin-top:8px;font-size:12px;color:var(--text-light)">空闲日：${freeDays.join('、')}</div>` : '<div style="margin-top:8px;font-size:12px;color:var(--pink-red)">未来7天已满</div>'}
-        </div>`;
+        html += '</div>';
       }
     } else if(type==='occupied'){
       // 在住：显示房间+猫咪+入住到退房时段
@@ -1038,33 +1084,99 @@ function openWeekView(){
   html += '<span>🟢 空闲</span><span>📕 预定</span><span>🐱 在住</span><span>🔧 维护</span>';
   html += '</div>';
 
-  // 表格
-  html += '<div class="week-table-wrap"><table class="week-table"><thead><tr>';
-  html += '<th class="room-col">房间</th>';
-  for(const d of days){
-    const isToday = sameDay(d, today);
-    html += `<th class="${isToday?'today-col':''}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:10px">${'日一二三四五六'[d.getDay()]}</span></th>`;
-  }
-  html += '</tr></thead><tbody>';
-
-  for(const r of ALL_ROOMS){
-    html += `<tr><td class="room-col">${r.label||r.id}</td>`;
+  // 按区域分类生成表格
+  for(const sec of BOARD_SECTIONS){
+    // 区域标题
+    html += `<div class="cat-divider" style="margin:8px 0 6px"><span class="icon">${sec.icon}</span><span>${sec.title} · ${sec.rooms.length}间</span></div>`;
+    // 表格
+    html += '<div class="week-table-wrap"><table class="week-table"><thead><tr>';
+    html += '<th class="room-col">房间</th>';
     for(const d of days){
-      const s = getRoomStatus(r.id, d);
       const isToday = sameDay(d, today);
-      let cellText = '';
-      if(s.booking) cellText = s.booking.catName;
-      html += `<td class="day-cell ${s.status} ${isToday?'today-col':''}" onclick="closeOverlay('weekOverlay');selectedDate=new Date(${d.getTime()});calMonth=new Date(${d.getTime()});renderAll();openRoomDetail('${r.id}')" title="${r.label||r.id} ${d.getMonth()+1}/${d.getDate()} ${s.status}${s.booking?' '+s.booking.catName:''}"></td>`;
+      html += `<th class="${isToday?'today-col':''}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:10px">${'日一二三四五六'[d.getDay()]}</span></th>`;
     }
-    html += '</tr>';
+    html += '</tr></thead><tbody>';
+    for(const r of sec.rooms){
+      html += `<tr><td class="room-col">${r.label||r.id}</td>`;
+      for(const d of days){
+        const s = getRoomStatus(r.id, d);
+        const isToday = sameDay(d, today);
+        html += `<td class="day-cell ${s.status} ${isToday?'today-col':''}" onclick="closeOverlay('weekOverlay');selectedDate=new Date(${d.getTime()});calMonth=new Date(${d.getTime()});renderAll();openRoomDetail('${r.id}')" title="${r.label||r.id} ${d.getMonth()+1}/${d.getDate()} ${s.status}${s.booking?' '+s.booking.catName:''}"></td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
   }
-  html += '</tbody></table></div>';
 
   // 说明
   html += '<div style="padding:8px 16px 16px;font-size:11px;color:var(--text-light)">💡 点击任意单元格可跳转到该日期该房间的详情。向右滑动查看更多天数。</div>';
 
   document.getElementById('weekBody').innerHTML = html;
   document.getElementById('weekOverlay').classList.add('show');
+}
+
+/* ============ 客户信息库 ============ */
+function openCustomerDB(){
+  document.getElementById('custSearch').value = '';
+  document.getElementById('custOverlay').classList.add('show');
+  renderCustList();
+}
+
+function renderCustList(){
+  const q = (document.getElementById('custSearch').value||'').trim().toLowerCase();
+  const body = document.getElementById('custBody');
+
+  // 从 bookings 提取去重客户（按猫名+手机号）
+  const seen = new Set();
+  const customers = [];
+  for(const b of bookings){
+    const key = b.catName+'|'+b.phone;
+    if(seen.has(key)) continue;
+    seen.add(key);
+    customers.push(b);
+  }
+
+  // 搜索过滤
+  let filtered = customers;
+  if(q){
+    filtered = customers.filter(b=>
+      b.catName.toLowerCase().includes(q) ||
+      b.ownerName.toLowerCase().includes(q) ||
+      b.phone.includes(q) ||
+      b.breed.toLowerCase().includes(q)
+    );
+  }
+
+  if(filtered.length===0){
+    body.innerHTML = '<div class="detail-card" style="text-align:center;color:var(--text-light);padding:30px"><div style="font-size:36px;margin-bottom:6px">🔍</div>'+(q?'没有找到匹配的客户':'暂无客户记录')+'</div>';
+    return;
+  }
+
+  let html = '<div style="padding:0 16px 10px;font-size:11px;color:var(--text-light)">共 '+filtered.length+' 位客户 · 点击查看详情</div>';
+  for(const b of filtered){
+    // 统计该客户预定次数
+    const count = bookings.filter(x=>x.catName===b.catName && x.phone===b.phone).length;
+    const ci = parseDT(b.checkIn);
+    const ciStr = ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit'}):'-';
+    html += `<div class="detail-card" onclick="closeOverlay('custOverlay');openRoomDetail('${b.roomId}','${b.id}')" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><span style="font-size:18px">🐱</span> <strong>${b.catName}</strong> <span style="font-size:11px;color:var(--text-light)">${b.breed}</span></div>
+        <span style="font-size:10px;color:var(--primary);background:var(--primary-light);padding:2px 8px;border-radius:8px;font-weight:600">预定${count}次</span>
+      </div>
+      <div class="detail-row"><span class="label">主人</span><span class="val">${b.ownerName}</span></div>
+      <div class="detail-row"><span class="label">电话</span><span class="val"><a href="tel:${b.phone}" style="color:var(--primary)" onclick="event.stopPropagation()">${b.phone}</a></span></div>
+      <div class="detail-row"><span class="label">年龄</span><span class="val">${b.age.value}${b.age.unit}</span></div>
+      <div class="detail-row"><span class="label">疫苗</span><span class="val">${b.vaccine}</span></div>
+      <div class="detail-row"><span class="label">绝育</span><span class="val">${b.neutered}</span></div>
+      ${b.deworm?`<div class="detail-row"><span class="label">驱虫</span><span class="val">${b.deworm}</span></div>`:''}
+      <div class="detail-row"><span class="label">健康</span><span class="val">${b.health.join('、')}</span></div>
+      ${b.notes?`<div class="detail-row"><span class="label">注意</span><span class="val" style="max-width:60%;text-align:right">${b.notes}</span></div>`:''}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-ghost" style="font-size:12px;padding:8px" onclick="event.stopPropagation();closeOverlay('custOverlay');openForm();setTimeout(()=>applyMatch('${b.id}'),200)">✏️ 用此客户新建预定</button>
+      </div>
+    </div>`;
+  }
+  body.innerHTML = html;
 }
 
 /* ============ 渲染：日历选择器 + 日期条 ============ */
@@ -1284,18 +1396,19 @@ function renderPickup(){
 function renderBookingCard(wrapId, items, dirText, dirIcon, emptyEmoji, emptyText){
   const wrap = document.getElementById(wrapId);
   if(items.length===0){
-    wrap.innerHTML = `<div class="pickup-empty"><span class="emoji">${emptyEmoji}</span><div class="text">${emptyText}</div></div>`;
+    wrap.innerHTML = `<div class="pickup-empty" style="margin:0;padding:14px"><span class="emoji" style="font-size:28px">${emptyEmoji}</span><div class="text" style="font-size:12px">${emptyText}</div></div>`;
     return;
   }
   const now = new Date();
-  const scroll = document.createElement('div');
-  scroll.className = 'pickup-scroll';
+  // 并排模式：纵向堆叠，不滚动
+  const container = document.createElement('div');
+  container.style.cssText = 'display:flex;flex-direction:column;gap:6px';
   for(const b of items){
     const time = parseDT(dirIcon==='in' ? b.checkIn : b.checkOut);
     const isUrgent = time > now && (time - now) < 3600000;
     const isDone = time <= now;
     const card = document.createElement('div');
-    card.className = 'pickup-card booking-card' + (isUrgent?' urgent':'') + (isDone?' arrived':'');
+    card.className = 'pickup-card booking-card compact' + (isUrgent?' urgent':'') + (isDone?' arrived':'');
     const hh = String(time.getHours()).padStart(2,'0');
     const mm = String(time.getMinutes()).padStart(2,'0');
     let countdown = '';
@@ -1307,22 +1420,23 @@ function renderBookingCard(wrapId, items, dirText, dirIcon, emptyEmoji, emptyTex
       const m = Math.floor((diff%3600000)/60000);
       countdown = `还有 ${h}时${m}分`;
     }
+    // 获取房间label
+    const room = ALL_ROOMS.find(r=>r.id===b.roomId);
+    const roomLabel = room ? room.label : b.roomId;
     card.innerHTML = `
       <div class="pickup-dir booking">${dirText}${isUrgent?' 🔔':''}</div>
       <div class="pickup-time">${hh}:${mm}</div>
-      <div class="pickup-cat">🐱 ${b.catName} <span style="font-size:11px;font-weight:400;opacity:0.7">${b.breed}</span></div>
+      <div class="pickup-cat">🐱 ${b.catName}</div>
       <div class="pickup-info">
-        <span class="tag">📍${b.roomId}</span>
-        <span class="tag">${b.ownerName}</span>
-        <span class="tag">${b.delivery}</span>
+        <span class="tag">📍${roomLabel}</span>
       </div>
       <div class="pickup-countdown">${countdown}</div>
     `;
     card.onclick = ()=>openRoomDetail(b.roomId, b.id);
-    scroll.appendChild(card);
+    container.appendChild(card);
   }
   wrap.innerHTML = '';
-  wrap.appendChild(scroll);
+  wrap.appendChild(container);
 }
 
 function renderBooking(){
@@ -1440,6 +1554,76 @@ function editBooking(id){
 }
 
 /* ============ 表单 ============ */
+/* ============ 客户信息自动匹配 ============ */
+function autoMatch(){
+  const owner = document.getElementById('f_ownerName').value.trim();
+  const phone = document.getElementById('f_phone').value.trim();
+  const cat = document.getElementById('f_catName').value.trim();
+  const list = document.getElementById('matchList');
+
+  // 编辑模式不触发匹配
+  if(formState.editId){ list.classList.remove('show'); return; }
+
+  // 至少输入2个字符才开始匹配
+  if(owner.length<2 && phone.length<3 && cat.length<1){
+    list.classList.remove('show'); return;
+  }
+
+  // 搜索已有 bookings 去重（按猫名+手机号）
+  const seen = new Set();
+  const matches = [];
+  for(const b of bookings){
+    const key = b.catName+'|'+b.phone;
+    if(seen.has(key)) continue;
+    let score = 0;
+    if(owner && b.ownerName.includes(owner)) score++;
+    if(phone && b.phone.includes(phone)) score++;
+    if(cat && b.catName.includes(cat)) score++;
+    if(score>0){
+      seen.add(key);
+      matches.push({...b, score});
+    }
+  }
+  matches.sort((a,b)=>b.score-a.score);
+
+  if(matches.length===0){ list.classList.remove('show'); return; }
+
+  list.innerHTML = matches.slice(0,5).map(b=>`
+    <div class="match-item" onclick="applyMatch('${b.id}')">
+      <span style="font-size:18px">🐱</span>
+      <div class="mi-info">
+        <div class="mi-cat">${b.catName} · ${b.ownerName}</div>
+        <div>${b.phone} · ${b.breed} · ${b.vaccine}</div>
+      </div>
+      <span class="mi-badge">一键填充</span>
+    </div>
+  `).join('');
+  list.classList.add('show');
+}
+
+function applyMatch(bookingId){
+  const b = bookings.find(x=>x.id===bookingId);
+  if(!b) return;
+  // 填充字段（不含预定信息，只填猫咪档案）
+  document.getElementById('f_ownerName').value = b.ownerName;
+  document.getElementById('f_phone').value = b.phone;
+  document.getElementById('f_catName').value = b.catName;
+  document.getElementById('f_breed').value = b.breed;
+  document.getElementById('f_age').value = b.age.value;
+  document.getElementById('f_weight').value = b.weight||'';
+  document.getElementById('f_notes').value = b.notes||'';
+  document.getElementById('f_address').value = b.address||'';
+  formState.ageUnit = b.age.unit;
+  formState.vaccine = b.vaccine;
+  formState.neuter = b.neutered;
+  formState.deworm = b.deworm || '';
+  formState.health = [...b.health];
+  formState.delivery = b.delivery || '';
+  syncTagBtns();
+  document.getElementById('matchList').classList.remove('show');
+  toast('已自动填充 '+b.catName+' 的信息 ✨');
+}
+
 function openForm(booking, presetRoom){
   // 重置
   formState = { ageUnit:'岁', vaccine:'', neuter:'', deworm:'', health:[], roomType:'', delivery:'', editId:null, presetRoom:null };
