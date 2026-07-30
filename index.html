@@ -187,6 +187,19 @@
   }
   .pickup-card.urgent .pickup-countdown { color: var(--pink-red); }
 
+  /* 预定卡片 - 蓝紫色系 */
+  .pickup-card.booking-card { background: linear-gradient(135deg, #F0EAFF 0%, #E0D4FF 100%); }
+  .pickup-card.booking-card::before { background: #9B7FD4; }
+  .pickup-card.booking-card.arrived { background: linear-gradient(135deg, #E8F7EE 0%, #D0F0DC 100%); }
+  .pickup-card.booking-card.arrived::before { background: var(--mint); }
+  .pickup-dir.booking { color: #7B5FBE; }
+  .pickup-card.booking-card .pickup-time { color: #7B5FBE; }
+  .pickup-card.booking-card.arrived .pickup-time { color: #4DA880; }
+  .pickup-card.booking-card.urgent { background: linear-gradient(135deg, #FFE0E6 0%, #FFC8D4 100%); animation: urgentPulse 1.5s ease-in-out infinite; }
+  .pickup-card.booking-card.urgent::before { background: var(--pink-red); }
+  .pickup-card.booking-card.urgent .pickup-time { color: var(--pink-red); }
+  .pickup-card.booking-card.urgent .pickup-dir { color: var(--pink-red); }
+
   /* 空状态 */
   .pickup-empty {
     margin: 0 16px; padding: 20px;
@@ -465,26 +478,19 @@
   <div id="pickupWrap"></div>
 </div>
 
+<!-- ============ 今日预定横幅（重点突出）============ -->
+<div class="pickup-section">
+  <div class="pickup-section-title">📋 今日预定入住</div>
+  <div id="bookingWrap"></div>
+</div>
+
 <!-- ============ 日期条 ============ -->
 <div class="date-bar-wrap">
   <div class="date-scroll" id="dateScroll"></div>
 </div>
 
-<!-- ============ 房型看板 ============ -->
-<div id="boardWrap">
-  <div class="room-section">
-    <div class="cat-divider"><span class="icon">🏠</span><span>大柜区 · 6间</span></div>
-    <div class="room-grid large" id="gridLarge"></div>
-  </div>
-  <div class="room-section">
-    <div class="cat-divider"><span class="icon">📦</span><span>小柜区 · 18间</span></div>
-    <div class="room-grid small" id="gridSmall"></div>
-  </div>
-  <div class="room-section">
-    <div class="cat-divider"><span class="icon">👑</span><span>包房区 · 2间</span></div>
-    <div class="room-grid vip" id="gridVip"></div>
-  </div>
-</div>
+<!-- ============ 房型看板（动态渲染分区）============ -->
+<div id="boardWrap"></div>
 
 <!-- 本周接送一览 -->
 <div class="week-list" id="weekList" style="display:none">
@@ -650,7 +656,7 @@
 
 <script>
 /* ============ 数据层 ============ */
-const STORAGE_KEY = 'cat_hotel_bookings_v1';
+const STORAGE_KEY = 'cat_hotel_bookings_v2';
 let bookings = [];
 let selectedDate = new Date();
 let formState = {
@@ -659,12 +665,23 @@ let formState = {
   roomType: '', delivery: '', editId: null, presetRoom: null
 };
 
-// 房间配置
+// 房间配置 - 按房间分组
+// 大柜全部在客厅，6个一组；小柜4组共24个，分布在主卧/次卧/客厅
 const ROOMS = {
-  large: Array.from({length:6},(_,i)=>({id:'L'+(i+1),type:'大柜'})),
-  small: Array.from({length:18},(_,i)=>({id:'S'+(i+1),type:'小柜'})),
+  large: Array.from({length:6},(_,i)=>({id:'大柜'+(i+1),type:'大柜'})),
+  small: Array.from({length:24},(_,i)=>({id:'小柜'+(i+1),type:'小柜'})),
   vip:   Array.from({length:2},(_,i)=>({id:'V'+(i+1),type:'包房'}))
 };
+
+// 看板分区配置
+const BOARD_SECTIONS = [
+  { title:'客厅大柜', icon:'🏠', rooms: ROOMS.large, gridClass:'large' },
+  { title:'主卧小柜 · 第1组', icon:'🛏️', rooms: ROOMS.small.slice(0,6), gridClass:'small' },
+  { title:'主卧小柜 · 第2组', icon:'🛏️', rooms: ROOMS.small.slice(6,12), gridClass:'small' },
+  { title:'次卧小柜 · 第3组', icon:'🚪', rooms: ROOMS.small.slice(12,18), gridClass:'small' },
+  { title:'客厅小柜 · 第4组', icon:'🛋️', rooms: ROOMS.small.slice(18,24), gridClass:'small' },
+  { title:'包房区', icon:'👑', rooms: ROOMS.vip, gridClass:'vip' }
+];
 
 // 示例数据
 function loadSampleData(){
@@ -683,7 +700,7 @@ function loadSampleData(){
       catName:'咪咪', breed:'布偶', age:{value:2,unit:'岁'}, weight:4.5,
       vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
       notes:'怕生，不要和其他猫接触',
-      roomType:'大柜', roomId:'L1',
+      roomType:'大柜', roomId:'大柜1',
       checkIn:fmt(t), checkOut:fmt(out1),
       delivery:'主人送达', address:''
     },
@@ -701,7 +718,7 @@ function loadSampleData(){
       catName:'团子', breed:'英短', age:{value:1,unit:'岁'}, weight:3.8,
       vaccine:'已完整接种', neutered:'已绝育', health:['健康'],
       notes:'很黏人，喜欢玩毛线球',
-      roomType:'小柜', roomId:'S3',
+      roomType:'小柜', roomId:'小柜3',
       checkIn:fmt(in3), checkOut:fmt(t2),
       delivery:'顺风车', address:''
     }
@@ -835,9 +852,21 @@ function toggleMaintenance(roomId){
 }
 
 function renderBoard(){
-  renderRoomGrid(document.getElementById('gridLarge'), ROOMS.large, false);
-  renderRoomGrid(document.getElementById('gridSmall'), ROOMS.small, false);
-  renderRoomGrid(document.getElementById('gridVip'), ROOMS.vip, true);
+  const wrap = document.getElementById('boardWrap');
+  wrap.innerHTML = '';
+  for(const sec of BOARD_SECTIONS){
+    const sectionEl = document.createElement('div');
+    sectionEl.className = 'room-section';
+    const divider = document.createElement('div');
+    divider.className = 'cat-divider';
+    divider.innerHTML = `<span class="icon">${sec.icon}</span><span>${sec.title} · ${sec.rooms.length}间</span>`;
+    sectionEl.appendChild(divider);
+    const grid = document.createElement('div');
+    grid.className = 'room-grid '+sec.gridClass;
+    sectionEl.appendChild(grid);
+    wrap.appendChild(sectionEl);
+    renderRoomGrid(grid, sec.rooms, sec.gridClass==='vip');
+  }
 }
 
 /* ============ 渲染：接送时间横幅 ============ */
@@ -895,6 +924,62 @@ function renderPickup(){
   wrap.appendChild(scroll);
 }
 
+/* ============ 渲染：今日预定横幅（重点突出）============ */
+function renderBooking(){
+  const wrap = document.getElementById('bookingWrap');
+  const today = new Date();
+  const items = bookings.filter(b=>{
+    const ci = parseDT(b.checkIn);
+    return ci && sameDay(ci, today);
+  });
+  items.sort((a,b)=>{
+    const ta=parseDT(a.checkIn), tb=parseDT(b.checkIn);
+    return ta-tb;
+  });
+
+  if(items.length===0){
+    wrap.innerHTML = '<div class="pickup-empty"><span class="emoji">📋</span><div class="text">今天没有预定入住</div></div>';
+    return;
+  }
+
+  const now = new Date();
+  const scroll = document.createElement('div');
+  scroll.className = 'pickup-scroll';
+  for(const b of items){
+    const ci = parseDT(b.checkIn);
+    const isUrgent = ci > now && (ci - now) < 3600000;
+    const isArrived = ci <= now;
+    const card = document.createElement('div');
+    card.className = 'pickup-card booking-card' + (isUrgent?' urgent':'') + (isArrived?' arrived':'');
+    const hh = String(ci.getHours()).padStart(2,'0');
+    const mm = String(ci.getMinutes()).padStart(2,'0');
+    let countdown = '';
+    if(isArrived){
+      countdown = '✅ 已到店';
+    } else if(ci > now){
+      const diff = ci - now;
+      const h = Math.floor(diff/3600000);
+      const m = Math.floor((diff%3600000)/60000);
+      countdown = `还有 ${h}时${m}分入住`;
+    }
+    card.innerHTML = `
+      <div class="pickup-dir booking">📋 预定入住${isUrgent?' 🔔':''}</div>
+      <div class="pickup-time">${hh}:${mm}</div>
+      <div class="pickup-cat">🐱 ${b.catName} <span style="font-size:11px;font-weight:400;opacity:0.7">${b.breed}</span></div>
+      <div class="pickup-info">
+        <span class="tag">📍${b.roomId}</span>
+        <span class="tag">${b.ownerName}</span>
+        <span class="tag">${b.delivery}</span>
+      </div>
+      <div class="pickup-countdown">${countdown}</div>
+    `;
+    card.onclick = ()=>openRoomDetail(b.roomId, b.id);
+    scroll.appendChild(card);
+  }
+  wrap.innerHTML = '';
+  wrap.appendChild(scroll);
+}
+
 /* ============ 渲染：本周接送 ============ */
 function renderWeekList(){
   const body = document.getElementById('weekListBody');
@@ -926,6 +1011,7 @@ function renderAll(){
   renderDateBar();
   renderBoard();
   renderPickup();
+  renderBooking();
   renderWeekList();
 }
 
@@ -1168,7 +1254,7 @@ function toast(msg){
 }
 
 /* ============ 倒计时实时刷新 ============ */
-setInterval(()=>{ renderPickup(); }, 30000);
+setInterval(()=>{ renderPickup(); renderBooking(); }, 30000);
 
 /* ============ 启动 ============ */
 loadData();
