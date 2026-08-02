@@ -709,7 +709,7 @@
         <div id="matchList" class="match-list"></div>
       </div>
       <div class="field">
-        <label class="field-label">联系电话 <span class="req">*</span></label>
+        <label class="field-label">联系电话</label>
         <input type="tel" id="f_phone" placeholder="11位手机号" maxlength="11" oninput="autoMatch()">
       </div>
       <div class="field">
@@ -718,18 +718,22 @@
       </div>
       <div class="field">
         <label class="field-label">猫咪品种</label>
-        <select id="f_breed">
-          <option value="布偶">布偶</option>
-          <option value="英短">英短</option>
-          <option value="美短">美短</option>
-          <option value="暹罗">暹罗</option>
-          <option value="橘猫">橘猫</option>
-          <option value="狸花">狸花</option>
-          <option value="缅因">缅因</option>
-          <option value="斯芬克斯">斯芬克斯</option>
-          <option value="加菲">加菲</option>
-          <option value="其他">其他</option>
-        </select>
+        <input type="text" id="f_breed" list="breedList" placeholder="如布偶、英短、或手动输入">
+        <datalist id="breedList">
+          <option value="布偶">
+          <option value="英短">
+          <option value="美短">
+          <option value="暹罗">
+          <option value="橘猫">
+          <option value="狸花">
+          <option value="缅因">
+          <option value="斯芬克斯">
+          <option value="加菲">
+          <option value="波斯">
+          <option value="折耳">
+          <option value="孟加拉">
+          <option value="田园猫">
+        </datalist>
       </div>
     </div>
 
@@ -1810,7 +1814,7 @@ function openForm(booking, presetRoom){
   document.getElementById('f_ownerName').value='';
   document.getElementById('f_phone').value='';
   document.getElementById('f_catName').value='';
-  document.getElementById('f_breed').value='布偶';
+  document.getElementById('f_breed').value='';
   document.getElementById('f_age').value='';
   document.getElementById('f_weight').value='';
   document.getElementById('f_notes').value='';
@@ -1978,7 +1982,6 @@ function saveForm(){
   const checkOut = document.getElementById('f_checkOut').value;
 
   if(!ownerName){ toast('请填写主人姓名'); return; }
-  if(!phone){ toast('请填写联系电话'); return; }
   if(!catName){ toast('请填写猫咪名字'); return; }
   if(!age || age<0){ toast('请填写年龄'); return; }
   if(!formState.roomType){ toast('请选择房型'); return; }
