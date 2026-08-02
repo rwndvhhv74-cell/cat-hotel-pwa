@@ -25,6 +25,7 @@
 
 <!-- PWA Manifest -->
 <link rel="manifest" href="manifest.json">
+<script src="config.js"></script>
 
 <title>🐱 猫咪寄养工作台</title>
 <style>
@@ -358,6 +359,21 @@
   .room-card.vip-card .room-id { font-size: 11px; }
   .room-card.vip-card .room-cat { font-size: 12px; }
 
+  /* 整组包房卡片 */
+  .whole-booking-card {
+    margin: 0 16px; padding: 16px;
+    background: linear-gradient(135deg, #F0EAFF 0%, #E0D4FF 100%);
+    border-radius: var(--radius); display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow); cursor: pointer; transition: transform 0.12s;
+    border-left: 5px solid #9B7FD4;
+  }
+  .whole-booking-card:active { transform: scale(0.98); }
+  .whole-booking-card .whole-icon { font-size: 32px; }
+  .whole-booking-card .whole-info { flex: 1; }
+  .whole-booking-card .whole-title { font-size: 15px; font-weight: 700; color: #7B5FBE; }
+  .whole-booking-card .whole-detail { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+  .whole-booking-card .whole-time { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+
   /* ============ 底部按钮 ============ */
   .fab {
     position: fixed; bottom: 20px; right: 20px; z-index: 90;
@@ -575,7 +591,10 @@
 <div class="header">
   <div class="header-top">
     <div class="header-title">🐾 猫咪寄养工作台</div>
-    <div style="font-size:12px;opacity:0.9" id="todayLabel"></div>
+    <div style="font-size:12px;opacity:0.9;display:flex;align-items:center;gap:6px">
+      <span id="syncStatus">☁️ 加载中…</span>
+      <span id="todayLabel"></span>
+    </div>
   </div>
   <div class="header-stats" id="statsBar">
     <div class="stat-pill green" onclick="showStatList('free')"><span>🟢 空闲</span><span class="num" id="statFree">0</span></div>
@@ -620,7 +639,7 @@
 
 <!-- 快捷功能按钮 -->
 <div style="padding:4px 16px 0;display:flex;gap:8px">
-  <button class="btn btn-primary" style="flex:1;padding:11px;font-size:13px" onclick="openWeekView()">📊 一周房态</button>
+  <button class="btn btn-primary" style="flex:1;padding:11px;font-size:13px" onclick="openWeekView()">📊 一月房态</button>
   <button class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;border-color:var(--primary);color:var(--primary)" onclick="openCustomerDB()">🔍 客户信息库</button>
 </div>
 
@@ -658,7 +677,7 @@
 <div class="overlay" id="weekOverlay" onclick="if(event.target===this)closeOverlay('weekOverlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-title">📊 一周房态总览</div>
+    <div class="sheet-title">📊 一月房态总览</div>
     <div id="weekBody"></div>
   </div>
 </div>
@@ -786,6 +805,7 @@
           <button class="tag-btn" onclick="pickTag('roomType','大柜',this)">🏠 大柜</button>
           <button class="tag-btn" onclick="pickTag('roomType','小柜',this)">📦 小柜</button>
           <button class="tag-btn" onclick="pickTag('roomType','包房',this)">👑 包房</button>
+          <button class="tag-btn" onclick="pickTag('roomType','主卧包房',this)">🏠 主卧整组包房</button>
         </div>
       </div>
       <!-- 空房可视化：显示该房型可预订的房间 -->
@@ -807,12 +827,19 @@
         </div>
       </div>
       <div class="field">
-        <label class="field-label">送店方式</label>
+        <label class="field-label">送店方式（到店）</label>
         <div class="tag-group">
           <button class="tag-btn" onclick="pickTag('delivery','主人送达',this)">🚶 主人送达</button>
-          <button class="tag-btn" onclick="pickTag('delivery','上门接送',this)">🚗 上门接送</button>
+          <button class="tag-btn" onclick="pickTag('delivery','上门接猫',this)">🚗 上门接猫</button>
           <button class="tag-btn" onclick="pickTag('delivery','顺风车',this)">🚕 顺风车</button>
           <button class="tag-btn" onclick="pickTag('delivery','其他',this)">其他</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">回家方式（离店）</label>
+        <div class="tag-group">
+          <button class="tag-btn" onclick="pickTag('goHome','主人到店接回',this)">🚶 主人到店接回</button>
+          <button class="tag-btn" onclick="pickTag('goHome','店铺送猫回家',this)">🚗 店铺送猫回家</button>
         </div>
       </div>
       <div class="field" id="addrField" style="display:none">
@@ -839,13 +866,13 @@
 
 <script>
 /* ============ 数据层 ============ */
-const STORAGE_KEY = 'cat_hotel_bookings_v3';
+const STORAGE_KEY = 'cat_hotel_bookings_v4';
 let bookings = [];
 let selectedDate = new Date();
 let formState = {
   ageUnit: '岁',
   vaccine: '', neuter: '', deworm: '', health: [],
-  roomType: '', delivery: '', editId: null, presetRoom: null
+  roomType: '', delivery: '', goHome: '', editId: null, presetRoom: null
 };
 
 // 房间配置 - 按区域分类，每组独立编号
@@ -857,10 +884,10 @@ function makeCabins(area, type, count){
 // 看板分区配置
 const BOARD_SECTIONS = [
   { title:'客厅大柜', icon:'🏠', rooms: makeCabins('客厅大柜','大柜',6), gridClass:'large', areaKey:'客厅大柜' },
-  { title:'主卧小柜', icon:'🛏️', rooms: makeCabins('主卧小柜','小柜',12), gridClass:'small', areaKey:'主卧小柜' },
+  { title:'主卧小柜', icon:'🛏️', rooms: makeCabins('主卧小柜','小柜',12), gridClass:'small', areaKey:'主卧小柜', allowWhole:true },
   { title:'客厅小柜', icon:'🛋️', rooms: makeCabins('客厅小柜','小柜',6), gridClass:'small', areaKey:'客厅小柜' },
   { title:'次卧小柜', icon:'🚪', rooms: makeCabins('次卧小柜','小柜',6), gridClass:'small', areaKey:'次卧小柜' },
-  { title:'包房区', icon:'👑', rooms: makeCabins('包房','包房',2), gridClass:'vip', areaKey:'包房' }
+  { title:'包房区', icon:'👑', rooms: makeCabins('包房','包房',1), gridClass:'vip', areaKey:'包房' }
 ];
 
 // 扁平化所有房间，用于房态计算和表单分配
@@ -885,7 +912,7 @@ function loadSampleData(){
       notes:'怕生，不要和其他猫接触',
       roomType:'大柜', roomId:'客厅大柜-大柜1',
       checkIn:fmt(t), checkOut:fmt(out1),
-      delivery:'主人送达', address:''
+      delivery:'主人送达', goHome:'主人到店接回', address:''
     },
     {
       id:'b002', ownerName:'李先生', phone:'13987654321',
@@ -894,7 +921,7 @@ function loadSampleData(){
       notes:'每天需服药，有过敏体质',
       roomType:'包房', roomId:'包房-包房1',
       checkIn:fmt(tom), checkOut:'',
-      delivery:'上门接送', address:'朝阳区xx路123号'
+      delivery:'上门接猫', goHome:'店铺送猫回家', address:'朝阳区xx路123号'
     },
     {
       id:'b003', ownerName:'王阿姨', phone:'13611112222',
@@ -903,21 +930,112 @@ function loadSampleData(){
       notes:'很黏人，喜欢玩毛线球',
       roomType:'小柜', roomId:'主卧小柜-小柜3',
       checkIn:fmt(in3), checkOut:fmt(t2),
-      delivery:'顺风车', address:''
+      delivery:'顺风车', goHome:'主人到店接回', address:''
     }
   ];
+}
+
+/* ============ 云端同步配置（从config.js加载）============ */
+const GITHUB_TOKEN = window.CAT_HOTEL_CONFIG ? window.CAT_HOTEL_CONFIG.token : '';
+const GITHUB_OWNER = 'rwndvhhv74-cell';
+const GITHUB_REPO = 'cat-hotel-pwa';
+const GITHUB_DATA_PATH = 'data.json';
+const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_DATA_PATH}`;
+
+let cloudSyncing = false; // 是否正在同步中
+let cloudSHA = null; // 远程文件的SHA，更新时需要
+
+// 从云端拉取数据
+async function cloudLoad(){
+  try {
+    cloudSyncing = true; updateSyncStatus();
+    const resp = await fetch(GITHUB_API, {
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if(resp.status===404){
+      // 远程没有data.json，首次使用，上传本地数据
+      cloudSyncing = false;
+      if(bookings.length>0) cloudSave();
+      return null;
+    }
+    if(!resp.ok) throw new Error('GitHub API: '+resp.status);
+    const data = await resp.json();
+    cloudSHA = data.sha;
+    const content = JSON.parse(atob(data.content.replace(/\n/g,'')));
+    return content;
+  } catch(e){
+    console.log('[云端] 拉取失败:', e.message);
+    return null;
+  } finally {
+    cloudSyncing = false; updateSyncStatus();
+  }
+}
+
+// 推送数据到云端
+async function cloudSave(){
+  try {
+    cloudSyncing = true; updateSyncStatus();
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(bookings))));
+    const body = { message: '📦 同步预定数据 ' + new Date().toLocaleString('zh-CN'), content: content };
+    if(cloudSHA) body.sha = cloudSHA;
+    const resp = await fetch(GITHUB_API, {
+      method: 'PUT',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if(resp.ok){
+      const data = await resp.json();
+      cloudSHA = data.content.sha;
+      console.log('[云端] 同步成功');
+      toast('☁️ 已同步到云端');
+    } else {
+      const err = await resp.json();
+      console.log('[云端] 同步失败:', err.message);
+      toast('⚠️ 云端同步失败，数据已存本地');
+    }
+  } catch(e){
+    console.log('[云端] 同步异常:', e.message);
+  } finally {
+    cloudSyncing = false; updateSyncStatus();
+  }
+}
+
+// 同步状态指示器
+function updateSyncStatus(){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(cloudSyncing){
+    el.textContent = '🔄 同步中…';
+    el.style.color = '#FF9F6B';
+  } else {
+    el.textContent = '☁️ 已同步';
+    el.style.color = '#7DD3A8';
+  }
 }
 
 function loadData(){
   const raw = localStorage.getItem(STORAGE_KEY);
   if(raw){
-    try { bookings = JSON.parse(raw); return; } catch(e){}
+    try { bookings = JSON.parse(raw); } catch(e){ bookings = loadSampleData(); saveData(); }
+  } else {
+    bookings = loadSampleData();
+    saveData();
   }
-  bookings = loadSampleData();
-  saveData();
+  // 异步从云端拉取最新数据
+  cloudLoad().then(remote=>{
+    if(remote && Array.isArray(remote)){
+      bookings = remote;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+      renderAll();
+      toast('☁️ 已从云端同步 '+bookings.length+' 条预定');
+    }
+  });
 }
 function saveData(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
+  // 防抖：避免频繁保存时多次请求
+  clearTimeout(window._saveTimer);
+  window._saveTimer = setTimeout(()=> cloudSave(), 800);
 }
 
 /* ============ 日期工具 ============ */
@@ -928,10 +1046,35 @@ function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()=
 function parseDT(s){ if(!s) return null; const d=new Date(s); return isNaN(d)?null:d; }
 
 /* ============ 房态计算 ============ */
+/* ============ 整组包房判断 ============ */
+// 判断某区域在指定日期是否被整组包房预定
+function getWholeBooking(areaKey, date){
+  const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
+  const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
+  for(const b of bookings){
+    if(b.roomType!=='主卧包房') continue;
+    if(b.areaKey!==areaKey && !b.roomId.startsWith(areaKey)) continue;
+    const ci = parseDT(b.checkIn);
+    const co = b.checkOut?parseDT(b.checkOut):null;
+    if(!ci) continue;
+    if(ci <= dayEnd && (!co || co >= dayStart)){
+      return b;
+    }
+  }
+  return null;
+}
+
 function getRoomStatus(roomId, date){
   // 维护中（暂用 localStorage 标记）
   const maints = JSON.parse(localStorage.getItem('cat_hotel_maintenance')||'[]');
   if(maints.includes(roomId)) return {status:'maintenance', booking:null};
+
+  // 检查该房间所属区域是否被整组包房
+  const room = ALL_ROOMS.find(r=>r.id===roomId);
+  if(room && room.area){
+    const whole = getWholeBooking(room.area, date);
+    if(whole) return {status:'occupied', booking:whole, wholeBooking:true};
+  }
 
   const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
   const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
@@ -1049,7 +1192,7 @@ function showStatList(type){
         const ci = parseDT(b.checkIn);
         const ciStr = ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-';
         // 到店方式判断
-        const isShop = b.delivery==='上门接送' || b.delivery==='顺风车';
+        const isShop = b.delivery==='上门接猫' || b.delivery==='顺风车';
         const deliveryIcon = isShop ? '🚗 店铺接猫' : '👨‍👩‍👧 家长送猫';
         html += `<div class="detail-card" onclick="openRoomDetail('${it.room.id}','${b.id}')" style="cursor:pointer">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1073,7 +1216,7 @@ function showStatList(type){
 function openWeekView(){
   const today = new Date(); today.setHours(0,0,0,0);
   const days = [];
-  for(let i=0;i<7;i++){
+  for(let i=0;i<30;i++){
     const d = new Date(today); d.setDate(d.getDate()+i);
     days.push(d);
   }
@@ -1082,13 +1225,12 @@ function openWeekView(){
   // 图例
   html += '<div style="padding:4px 16px 10px;font-size:11px;color:var(--text-light);display:flex;gap:12px;flex-wrap:wrap">';
   html += '<span>🟢 空闲</span><span>📕 预定</span><span>🐱 在住</span><span>🔧 维护</span>';
+  html += '<span style="margin-left:auto">📅 未来30天 · 向右滑动查看更多</span>';
   html += '</div>';
 
   // 按区域分类生成表格
   for(const sec of BOARD_SECTIONS){
-    // 区域标题
     html += `<div class="cat-divider" style="margin:8px 0 6px"><span class="icon">${sec.icon}</span><span>${sec.title} · ${sec.rooms.length}间</span></div>`;
-    // 表格
     html += '<div class="week-table-wrap"><table class="week-table"><thead><tr>';
     html += '<th class="room-col">房间</th>';
     for(const d of days){
@@ -1108,8 +1250,7 @@ function openWeekView(){
     html += '</tbody></table></div>';
   }
 
-  // 说明
-  html += '<div style="padding:8px 16px 16px;font-size:11px;color:var(--text-light)">💡 点击任意单元格可跳转到该日期该房间的详情。向右滑动查看更多天数。</div>';
+  html += '<div style="padding:8px 16px 16px;font-size:11px;color:var(--text-light)">💡 点击任意单元格可跳转到该日期该房间详情。左侧房间列固定不动，向右滑动查看30天。</div>';
 
   document.getElementById('weekBody').innerHTML = html;
   document.getElementById('weekOverlay').classList.add('show');
@@ -1329,6 +1470,29 @@ function renderBoard(){
     divider.className = 'cat-divider';
     divider.innerHTML = `<span class="icon">${sec.icon}</span><span>${sec.title} · ${sec.rooms.length}间</span>`;
     sectionEl.appendChild(divider);
+
+    // 如果该区域支持整组包房，检查当前日期是否被整组包房
+    if(sec.allowWhole){
+      const whole = getWholeBooking(sec.areaKey, selectedDate);
+      if(whole){
+        // 显示整组包房卡片
+        const wholeCard = document.createElement('div');
+        wholeCard.className = 'whole-booking-card';
+        wholeCard.innerHTML = `
+          <div class="whole-icon">🏠</div>
+          <div class="whole-info">
+            <div class="whole-title">整组包房 · ${whole.catName}</div>
+            <div class="whole-detail">${whole.ownerName} · ${whole.breed}</div>
+            <div class="whole-time">${parseDT(whole.checkIn)?.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2_digit',minute:'2_digit'})||''} ${whole.checkOut?'→ '+parseDT(whole.checkOut)?.toLocaleString('zh-CN',{month:'2-digit',day:'2_digit',minute:'2_digit'}):'未定退房'}</div>
+          </div>
+        `;
+        wholeCard.onclick = ()=>openRoomDetail(whole.roomId, whole.id);
+        sectionEl.appendChild(wholeCard);
+        wrap.appendChild(sectionEl);
+        continue;
+      }
+    }
+
     const grid = document.createElement('div');
     grid.className = 'room-grid '+sec.gridClass;
     sectionEl.appendChild(grid);
@@ -1345,8 +1509,9 @@ function renderPickup(){
   for(const b of bookings){
     const ci = parseDT(b.checkIn);
     const co = b.checkOut?parseDT(b.checkOut):null;
-    if(ci && sameDay(ci, today)) items.push({type:'in', time:ci, booking:b});
-    if(co && sameDay(co, today)) items.push({type:'out', time:co, booking:b});
+    // 今日待接送：只统计店铺接送的（上门接猫 + 店铺送猫回家）
+    if(ci && sameDay(ci, today) && b.delivery==='上门接猫') items.push({type:'in', time:ci, booking:b});
+    if(co && sameDay(co, today) && b.goHome==='店铺送猫回家') items.push({type:'out', time:co, booking:b});
   }
   items.sort((a,b)=>a.time-b.time);
 
@@ -1441,15 +1606,15 @@ function renderBookingCard(wrapId, items, dirText, dirIcon, emptyEmoji, emptyTex
 
 function renderBooking(){
   const today = new Date();
-  // 家长送猫到店 = 今天入住的
+  // 家长送猫到店 = 今天入住且送店方式是主人送达
   const inItems = bookings.filter(b=>{
     const ci = parseDT(b.checkIn);
-    return ci && sameDay(ci, today);
+    return ci && sameDay(ci, today) && b.delivery==='主人送达';
   }).sort((a,b)=>parseDT(a.checkIn)-parseDT(b.checkIn));
-  // 家长接猫回家 = 今天退房的
+  // 家长接猫回家 = 今天退房且回家方式是主人到店接回
   const outItems = bookings.filter(b=>{
     const co = b.checkOut?parseDT(b.checkOut):null;
-    return co && sameDay(co, today);
+    return co && sameDay(co, today) && b.goHome==='主人到店接回';
   }).sort((a,b)=>parseDT(a.checkOut)-parseDT(b.checkOut));
 
   renderBookingCard('bookingInWrap', inItems, '📦 家长送猫到店', 'in', '📦', '今天没有家长送猫到店');
@@ -1523,6 +1688,7 @@ function openRoomDetail(roomId, highlightBookingId){
         <div class="detail-row"><span class="label">入住</span><span class="val">${ci?ci.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-'}</span></div>
         <div class="detail-row"><span class="label">退房</span><span class="val">${co?co.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'未定'}</span></div>
         <div class="detail-row"><span class="label">送店</span><span class="val">${b.delivery}</span></div>
+        ${b.goHome?`<div class="detail-row"><span class="label">回家</span><span class="val">${b.goHome}</span></div>`:''}
         ${b.address?`<div class="detail-row"><span class="label">地址</span><span class="val">${b.address}</span></div>`:''}
         ${b.notes?`<div class="detail-row"><span class="label">注意</span><span class="val" style="max-width:60%;text-align:right">${b.notes}</span></div>`:''}
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -1626,7 +1792,7 @@ function applyMatch(bookingId){
 
 function openForm(booking, presetRoom){
   // 重置
-  formState = { ageUnit:'岁', vaccine:'', neuter:'', deworm:'', health:[], roomType:'', delivery:'', editId:null, presetRoom:null };
+  formState = { ageUnit:'岁', vaccine:'', neuter:'', deworm:'', health:[], roomType:'', delivery:'', goHome:'', editId:null, presetRoom:null };
   document.getElementById('f_ownerName').value='';
   document.getElementById('f_phone').value='';
   document.getElementById('f_catName').value='';
@@ -1667,6 +1833,7 @@ function openForm(booking, presetRoom){
     formState.health = [...booking.health];
     formState.roomType = booking.roomType;
     formState.delivery = booking.delivery;
+    formState.goHome = booking.goHome || '';
     // 标记按钮
     syncTagBtns();
   } else if(presetRoom){
@@ -1736,11 +1903,12 @@ function syncTagBtns(){
   // roomType & delivery - 遍历所有 tag-btn
   document.querySelectorAll('.tag-btn').forEach(el=>{
     const t = el.textContent.replace(/^[^\u4e00-\u9fa5]+/,'').trim();
-    if(['大柜','小柜','包房'].includes(t)) el.classList.toggle('active', t===formState.roomType);
-    if(['主人送达','上门接送','顺风车','其他'].includes(t)) el.classList.toggle('active', t===formState.delivery);
+    if(['大柜','小柜','包房','主卧包房'].includes(t)) el.classList.toggle('active', t===formState.roomType);
+    if(['主人送达','上门接猫','顺风车','其他'].includes(t)) el.classList.toggle('active', t===formState.delivery);
+    if(['主人到店接回','店铺送猫回家'].includes(t)) el.classList.toggle('active', t===formState.goHome);
   });
   // 地址栏
-  document.getElementById('addrField').style.display = (formState.delivery==='上门接送')?'block':'none';
+  document.getElementById('addrField').style.display = (formState.delivery==='上门接猫'||formState.goHome==='店铺送猫回家')?'block':'none';
   // 空房可视化
   renderAvailGrid();
 }
@@ -1762,7 +1930,16 @@ function pickTag(key, val, el){
   }
   else if(key==='delivery'){
     formState.delivery = val;
-    document.getElementById('addrField').style.display = (val==='上门接送')?'block':'none';
+    // 上门接猫 或 店铺送猫回家 时显示地址
+    document.getElementById('addrField').style.display = (val==='上门接猫')?'block':'none';
+  }
+  else if(key==='goHome'){
+    formState.goHome = val;
+    if(val==='店铺送猫回家'){
+      document.getElementById('addrField').style.display = 'block';
+    } else if(formState.delivery!=='上门接猫'){
+      document.getElementById('addrField').style.display = 'none';
+    }
   }
   // 同组单选
   if(el){
@@ -1798,13 +1975,45 @@ function saveForm(){
 
   // 选房
   let roomId = formState.presetRoom;
-  if(!roomId){
+  let areaKey = '';
+  if(formState.roomType==='主卧包房'){
+    // 主卧整组包房：检查该时段主卧小柜是否被整组包房
+    roomId = '主卧小柜-整组';
+    areaKey = '主卧小柜';
+    const ciDate0 = parseDT(checkIn);
+    const coDate0 = checkOut ? parseDT(checkOut) : null;
+    const conflict = getWholeBooking('主卧小柜', ciDate0 || selectedDate);
+    if(conflict){
+      toast('主卧小柜该时段已被整组包房预定');
+      return;
+    }
+  } else if(!roomId){
     // 自动分配同类型第一个空闲
     const roomsByType = ALL_ROOMS.filter(r=>r.type===formState.roomType);
     const date = parseDT(checkIn) || selectedDate;
     const free = roomsByType.find(r=>getRoomStatus(r.id, date).status==='free');
     if(!free){ toast('该房型已满，请换房型'); return; }
     roomId = free.id;
+  }
+
+  // 日期冲突检查：编辑时允许调整，但同一房间不能和其他客户的预定重叠
+  const ciDate = parseDT(checkIn);
+  const coDate = checkOut ? parseDT(checkOut) : null;
+  if(coDate && coDate < ciDate){ toast('退房日期不能早于入住日期'); return; }
+  // 检查同房间是否有其他客户的重叠预定
+  const conflict = bookings.find(b=>{
+    if(b.id===formState.editId) return false; // 排除自己
+    if(b.roomId!==roomId) return false;
+    const bCi = parseDT(b.checkIn);
+    const bCo = b.checkOut ? parseDT(b.checkOut) : null;
+    if(!bCi) return false;
+    // 日期重叠判断
+    const overlap = ciDate < (bCo||new Date(8640000000000000)) && (coDate||new Date(8640000000000000)) > bCi;
+    return overlap;
+  });
+  if(conflict){
+    toast('该房间此时段已被 '+conflict.catName+' 预定，无法调整');
+    return;
   }
 
   const data = {
@@ -1819,10 +2028,12 @@ function saveForm(){
     health: formState.health.length?formState.health:['健康'],
     notes: document.getElementById('f_notes').value.trim(),
     roomType: formState.roomType,
+    areaKey: areaKey,
     roomId: roomId,
     checkIn: checkIn,
     checkOut: checkOut || '',
     delivery: formState.delivery || '主人送达',
+    goHome: formState.goHome || '主人到店接回',
     address: document.getElementById('f_address').value.trim()
   };
 
