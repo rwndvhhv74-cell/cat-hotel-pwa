@@ -97,67 +97,24 @@
     font-size: 18px; font-weight: 700;
     display: flex; align-items: center; gap: 6px;
   }
-  .menu-btn {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: rgba(255,255,255,0.2); color: #fff;
-    font-size: 18px; display: flex; align-items: center; justify-content: center;
-  }
-  .menu-btn:active { background: rgba(255,255,255,0.35); }
 
-  /* ============ 侧边工作栏 ============ */
-  .sidebar-overlay {
-    position: fixed; inset: 0; z-index: 250;
-    background: rgba(93,78,60,0.4); display: none;
+  /* ============ 常驻横向工作栏 ============ */
+  .toolbar {
+    display: flex; background: var(--card-bg);
+    padding: 8px 4px; box-shadow: 0 1px 6px rgba(93,78,60,0.06);
+    position: sticky; top: 88px; z-index: 50;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
-  .sidebar-overlay.show { display: block; }
-  .sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 260;
-    width: 280px; max-width: 85vw; background: var(--bg);
-    transform: translateX(-100%); transition: transform 0.25s ease-out;
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
-    padding-bottom: 30px;
+  .toolbar::-webkit-scrollbar { display: none; }
+  .toolbar-item {
+    flex: 1; min-width: 52px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 6px 4px; cursor: pointer; transition: transform 0.12s;
   }
-  .sidebar.show { transform: translateX(0); }
-  .sidebar-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 16px 12px;
-    background: linear-gradient(135deg, var(--primary), #FFB088);
-    color: #fff;
-  }
-  .sidebar-close {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(255,255,255,0.25); color: #fff;
-    font-size: 16px; display: flex; align-items: center; justify-content: center;
-  }
-  .sidebar-section { padding: 8px 0; border-bottom: 1px solid var(--gray); }
-  .sidebar-title {
-    font-size: 12px; font-weight: 700; color: var(--text-light);
-    padding: 8px 16px 4px;
-  }
-  .sidebar-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--text);
-    cursor: pointer; transition: background 0.12s;
-  }
-  .sidebar-item:active { background: var(--primary-light); }
-  .sidebar-item .si-icon { font-size: 18px; width: 24px; text-align: center; }
-  .sidebar-rooms { padding: 4px 16px 8px; }
-  .sidebar-rooms .sr-item {
-    font-size: 13px; color: var(--text); padding: 5px 0;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .sidebar-rooms .sr-item span:first-child { font-size: 16px; }
-  .sidebar-rooms .sr-total {
-    font-size: 12px; color: var(--text-light); font-weight: 700;
-    margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--gray);
-  }
-  .sidebar-tip {
-    font-size: 12px; color: var(--text-light); padding: 4px 16px;
-  }
-  .sidebar-footer {
-    padding: 16px; font-size: 11px; color: var(--text-light); text-align: center;
-  }
+  .toolbar-item:active { transform: scale(0.9); }
+  .toolbar-item .ti-icon { font-size: 20px; }
+  .toolbar-item .ti-label { font-size: 10px; color: var(--text); font-weight: 600; }
 
   .header-stats {
     display: flex; gap: 8px; margin-top: 8px;
@@ -653,7 +610,6 @@
 <div class="header">
   <div class="header-top">
     <div style="display:flex;align-items:center;gap:8px">
-      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
       <div class="header-title">🐾 猫咪寄养工作台</div>
     </div>
     <div style="font-size:12px;opacity:0.9;display:flex;align-items:center;gap:6px">
@@ -668,65 +624,27 @@
   </div>
 </div>
 
-<!-- ============ 左侧工作栏 ============ -->
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-header">
-    <span style="font-size:20px;font-weight:700">🐾 工作栏</span>
-    <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+<!-- ============ 常驻工作栏（横向，一眼可见）============ -->
+<div class="toolbar">
+  <div class="toolbar-item" onclick="openForm()">
+    <span class="ti-icon">➕</span><span class="ti-label">新建预定</span>
   </div>
-
-  <div class="sidebar-section">
-    <div class="sidebar-title">📋 预定管理</div>
-    <div class="sidebar-item" onclick="toggleSidebar();openForm()">
-      <span class="si-icon">➕</span><span>新建预定</span>
-    </div>
-    <div class="sidebar-item" onclick="toggleSidebar();showStatList('booked')">
-      <span class="si-icon">📕</span><span>已预定列表</span>
-    </div>
-    <div class="sidebar-item" onclick="toggleSidebar();showStatList('occupied')">
-      <span class="si-icon">🐱</span><span>在住中</span>
-    </div>
-    <div class="sidebar-item" onclick="toggleSidebar();showStatList('free')">
-      <span class="si-icon">🟢</span><span>空闲房间</span>
-    </div>
+  <div class="toolbar-item" onclick="showStatList('free')">
+    <span class="ti-icon">🟢</span><span class="ti-label">空闲</span>
   </div>
-
-  <div class="sidebar-section">
-    <div class="sidebar-title">📊 数据视图</div>
-    <div class="sidebar-item" onclick="toggleSidebar();openWeekView()">
-      <span class="si-icon">📅</span><span>一月房态总览</span>
-    </div>
-    <div class="sidebar-item" onclick="toggleSidebar();openCustomerDB()">
-      <span class="si-icon">🔍</span><span>客户信息库</span>
-    </div>
+  <div class="toolbar-item" onclick="showStatList('occupied')">
+    <span class="ti-icon">🐱</span><span class="ti-label">在住</span>
   </div>
-
-  <div class="sidebar-section">
-    <div class="sidebar-title">🏠 房型说明</div>
-    <div class="sidebar-rooms">
-      <div class="sr-item"><span>🏠</span> 客厅大柜 ×6</div>
-      <div class="sr-item"><span>🛏️</span> 主卧小柜 ×12</div>
-      <div class="sr-item"><span>🛋️</span> 客厅小柜 ×6</div>
-      <div class="sr-item"><span>🚪</span> 次卧小柜 ×6</div>
-      <div class="sr-item"><span>👑</span> 包房区 ×1</div>
-      <div class="sr-total">合计 31 间</div>
-    </div>
+  <div class="toolbar-item" onclick="showStatList('booked')">
+    <span class="ti-icon">📕</span><span class="ti-label">预定</span>
   </div>
-
-  <div class="sidebar-section">
-    <div class="sidebar-title">💡 操作提示</div>
-    <div class="sidebar-tip">• 长按柜位 → 设为维护</div>
-    <div class="sidebar-tip">• 点击柜位 → 查看详情</div>
-    <div class="sidebar-tip">• 点击统计条 → 查看列表</div>
-    <div class="sidebar-tip">• 输入信息 → 自动匹配老客户</div>
-    <div class="sidebar-tip">• ☁️ 数据自动同步云端</div>
+  <div class="toolbar-item" onclick="openWeekView()">
+    <span class="ti-icon">📅</span><span class="ti-label">一月房态</span>
   </div>
-
-  <div class="sidebar-footer">
-    猫咪寄养工作台 v10<br>☁️ 云端同步已启用
+  <div class="toolbar-item" onclick="openCustomerDB()">
+    <span class="ti-icon">🔍</span><span class="ti-label">客户库</span>
   </div>
-</aside>
+</div>
 
 <!-- ============ 接送时间横幅 ============ -->
 <div class="pickup-section">
@@ -762,11 +680,6 @@
   <div class="date-scroll" id="dateScroll"></div>
 </div>
 
-<!-- 快捷功能按钮 -->
-<div style="padding:4px 16px 0;display:flex;gap:8px">
-  <button class="btn btn-primary" style="flex:1;padding:11px;font-size:13px" onclick="openWeekView()">📊 一月房态</button>
-  <button class="btn btn-ghost" style="flex:1;padding:11px;font-size:13px;border-color:var(--primary);color:var(--primary)" onclick="openCustomerDB()">🔍 客户信息库</button>
-</div>
 
 <!-- ============ 房型看板（动态渲染分区）============ -->
 <div id="boardWrap"></div>
@@ -2197,10 +2110,6 @@ function saveForm(){
 
 /* ============ 工具 ============ */
 function closeOverlay(id){ document.getElementById(id).classList.remove('show'); }
-function toggleSidebar(){
-  document.getElementById('sidebar').classList.toggle('show');
-  document.getElementById('sidebarOverlay').classList.toggle('show');
-}
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
