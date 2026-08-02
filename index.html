@@ -1313,11 +1313,25 @@ function renderCustList(){
       <div class="detail-row"><span class="label">健康</span><span class="val">${b.health.join('、')}</span></div>
       ${b.notes?`<div class="detail-row"><span class="label">注意</span><span class="val" style="max-width:60%;text-align:right">${b.notes}</span></div>`:''}
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-ghost" style="font-size:12px;padding:8px" onclick="event.stopPropagation();closeOverlay('custOverlay');openForm();setTimeout(()=>applyMatch('${b.id}'),200)">✏️ 用此客户新建预定</button>
+        <button class="btn btn-ghost" style="font-size:12px;padding:8px;flex:1" onclick="event.stopPropagation();closeOverlay('custOverlay');openForm();setTimeout(()=>applyMatch('${b.id}'),200)">✏️ 新建预定</button>
+        <button class="btn btn-danger" style="font-size:12px;padding:8px;flex:0 0 auto" onclick="event.stopPropagation();deleteCustomer('${b.catName}','${b.phone}')">🗑 删除</button>
       </div>
     </div>`;
   }
   body.innerHTML = html;
+}
+
+/* ============ 删除客户（删除该客户所有预定）============ */
+function deleteCustomer(catName, phone){
+  // 统计该客户有几条预定
+  const count = bookings.filter(b=>b.catName===catName && b.phone===phone).length;
+  if(!confirm(`确定删除「${catName}」吗？\n该客户有 ${count} 条预定记录，将全部删除。`)) return;
+  bookings = bookings.filter(b=>!(b.catName===catName && b.phone===phone));
+  saveData();
+  renderAll();
+  toast('🗑 已删除 '+catName);
+  // 刷新客户列表
+  renderCustList();
 }
 
 /* ============ 渲染：日历选择器 + 日期条 ============ */
